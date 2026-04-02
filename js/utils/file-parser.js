@@ -71,7 +71,7 @@ export async function parseAndMergeFiles(files, nameCol, urnCol) {
       const name = String(row[nameCol] || '').trim();
       const urn = urnCol ? String(row[urnCol] || '').trim() : '';
       if (name) {
-        allStudents.push({ name, urn });
+        allStudents.push({ name, urn, sourceFile: file.name });
       }
     }
   }

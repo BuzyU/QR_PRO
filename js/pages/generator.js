@@ -83,6 +83,7 @@ function renderConfigPanel(students) {
         <div class="form-group">
           <label class="form-label" for="assign-mode">Assignment Mode</label>
           <select class="form-select" id="assign-mode">
+            <option value="asis">As Uploaded (Per File)</option>
             <option value="random">Random</option>
             <option value="sequential">Sequential</option>
           </select>
@@ -121,28 +122,44 @@ function renderConfigPanel(students) {
     </div>
   `;
 
-  // Initial time slots render
-  updateTimeSlots(1);
+  const uniqueFiles = [...new Set(students.map((s) => s.sourceFile).filter(Boolean))];
+  const batchCountInput = document.getElementById('batch-count');
+  const assignModeInput = document.getElementById('assign-mode');
 
-  // Batch count change
-  document.getElementById('batch-count').addEventListener('input', (e) => {
+  function updateBatchCountState() {
+    if (assignModeInput.value === 'asis' && uniqueFiles.length > 0) {
+      batchCountInput.value = uniqueFiles.length;
+      batchCountInput.disabled = true;
+    } else {
+      batchCountInput.disabled = false;
+    }
+    const count = Math.max(1, Math.min(50, parseInt(batchCountInput.value) || 1));
+    updateTimeSlots(count, assignModeInput.value === 'asis' ? uniqueFiles : []);
+  }
+
+  assignModeInput.addEventListener('change', updateBatchCountState);
+
+  batchCountInput.addEventListener('input', (e) => {
     const count = Math.max(1, Math.min(50, parseInt(e.target.value) || 1));
-    updateTimeSlots(count);
+    updateTimeSlots(count, assignModeInput.value === 'asis' ? uniqueFiles : []);
   });
+
+  updateBatchCountState();
 
   document.getElementById('btn-back-gen').addEventListener('click', () => navigate('/details'));
   document.getElementById('btn-generate').addEventListener('click', () => handleGenerate(students));
 }
 
-function updateTimeSlots(count) {
+function updateTimeSlots(count, fileNames = []) {
   const slotsContainer = document.getElementById('slots-container');
   slotsContainer.innerHTML = '';
 
   for (let i = 1; i <= count; i++) {
     const div = document.createElement('div');
     div.className = 'batch-slot';
+    const label = fileNames[i - 1] ? `Batch ${i} (${fileNames[i - 1]})` : `Batch ${i}`;
     div.innerHTML = `
-      <span class="batch-slot-label">Batch ${i}</span>
+      <span class="batch-slot-label">${label}</span>
       <input class="form-input" type="text" id="slot-${i}"
         placeholder="e.g., 10:00 AM - 11:00 AM"
         style="padding: 10px 14px; font-size: 0.9rem;">
@@ -154,6 +171,7 @@ function updateTimeSlots(count) {
 async function handleGenerate(students) {
   const batchCount = parseInt(document.getElementById('batch-count').value) || 1;
   const assignMode = document.getElementById('assign-mode').value;
+  const uniqueFiles = [...new Set(students.map((s) => s.sourceFile).filter(Boolean))];
 
   // Collect time slots
   const timeSlots = [];
@@ -163,21 +181,33 @@ async function handleGenerate(students) {
   }
 
   // Assign students to batches
-  let studentList = [...students];
-  if (assignMode === 'random') {
-    studentList = shuffleArray(studentList);
-  }
-
   const batches = [];
-  const perBatch = Math.ceil(studentList.length / batchCount);
 
-  for (let i = 0; i < batchCount; i++) {
-    const batchStudents = studentList.slice(i * perBatch, (i + 1) * perBatch);
-    batches.push({
-      batchNumber: i + 1,
-      timeSlot: timeSlots[i],
-      students: batchStudents,
-    });
+  if (assignMode === 'asis' && uniqueFiles.length > 0) {
+    for (let i = 0; i < uniqueFiles.length; i++) {
+      const file = uniqueFiles[i];
+      const batchStudents = students.filter((s) => s.sourceFile === file);
+      batches.push({
+        batchNumber: i + 1,
+        timeSlot: timeSlots[i] || `Batch ${i + 1}`,
+        students: batchStudents
+      });
+    }
+  } else {
+    let studentList = [...students];
+    if (assignMode === 'random') {
+      studentList = shuffleArray(studentList);
+    }
+
+    const perBatch = Math.ceil(studentList.length / batchCount);
+    for (let i = 0; i < batchCount; i++) {
+      const batchStudents = studentList.slice(i * perBatch, (i + 1) * perBatch);
+      batches.push({
+        batchNumber: i + 1,
+        timeSlot: timeSlots[i],
+        students: batchStudents,
+      });
+    }
   }
 
   // Show progress UI
