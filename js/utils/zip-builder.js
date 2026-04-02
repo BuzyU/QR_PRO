@@ -11,7 +11,10 @@ export async function buildAndDownloadZip(tickets, eventName) {
   const zip = new JSZip();
 
   for (const ticket of tickets) {
-    const folderName = `Batch_${ticket.batchNumber}`;
+    let folderName = `Batch_${ticket.batchNumber}`;
+    if (ticket.sourceFilename) {
+      folderName = ticket.sourceFilename.replace(/\.[^/.]+$/, "");
+    }
     const fileName = `${ticket.studentName.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_')}.pdf`;
     zip.file(`${folderName}/${fileName}`, ticket.pdfBlob);
   }
@@ -44,5 +47,12 @@ export async function downloadSingleBatch(tickets, batchNumber, eventName) {
 
   const content = await zip.generateAsync({ type: 'blob' });
   const safeName = eventName.replace(/[^a-zA-Z0-9]/g, '_') || 'HallTickets';
-  saveAs(content, `${safeName}_Batch_${batchNumber}.zip`);
+  
+  let zipName = `${safeName}_Batch_${batchNumber}.zip`;
+  if (batchTickets[0] && batchTickets[0].sourceFilename) {
+    const baseStr = batchTickets[0].sourceFilename.replace(/\.[^/.]+$/, "");
+    zipName = `${safeName}_${baseStr}.zip`;
+  }
+  
+  saveAs(content, zipName);
 }

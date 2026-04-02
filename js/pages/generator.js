@@ -194,7 +194,8 @@ async function handleGenerate(students) {
       batches.push({
         batchNumber: i + 1,
         timeSlot: timeSlots[i] || `Batch ${i + 1}`,
-        students: batchStudents
+        students: batchStudents,
+        sourceFilename: file
       });
     }
   } else {
@@ -269,6 +270,7 @@ async function handleGenerate(students) {
 
         tickets.push({
           batchNumber: batch.batchNumber,
+          sourceFilename: batch.sourceFilename,
           studentName: student.name,
           pdfBlob,
           ticketId,
