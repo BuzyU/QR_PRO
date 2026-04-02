@@ -122,7 +122,9 @@ function renderConfigPanel(students) {
     </div>
   `;
 
-  const uniqueFiles = [...new Set(students.map((s) => s.sourceFile).filter(Boolean))];
+  const uniqueFiles = [...new Set(students.map((s) => s.sourceFile).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, undefined, { numeric: true })
+  );
   const batchCountInput = document.getElementById('batch-count');
   const assignModeInput = document.getElementById('assign-mode');
 
@@ -171,7 +173,9 @@ function updateTimeSlots(count, fileNames = []) {
 async function handleGenerate(students) {
   const batchCount = parseInt(document.getElementById('batch-count').value) || 1;
   const assignMode = document.getElementById('assign-mode').value;
-  const uniqueFiles = [...new Set(students.map((s) => s.sourceFile).filter(Boolean))];
+  const uniqueFiles = [...new Set(students.map((s) => s.sourceFile).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, undefined, { numeric: true })
+  );
 
   // Collect time slots
   const timeSlots = [];

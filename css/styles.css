@@ -823,21 +823,58 @@ a {
 .hidden { display: none !important; }
 
 /* --- Responsive --- */
-@media (max-width: 768px) {
-  .page-container { padding: 24px 16px; }
-  .glass-card, .glass-card-static { padding: 24px 20px; }
-  .form-row { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
   .step { padding: 8px 12px; font-size: 0.75rem; }
-  .step-line { width: 20px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .feature-grid { grid-template-columns: 1fr; }
-  .btn-lg { padding: 16px 32px; }
+  .step-line { width: 15px; }
+}
+
+@media (max-width: 768px) {
+  .page-container { padding: 20px 12px; }
+  .glass-card, .glass-card-static { padding: 20px 16px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+  
+  .form-row { grid-template-columns: 1fr; gap: 12px; }
+  .stats-grid { grid-template-columns: 1fr; gap: 12px; }
+  .feature-grid { grid-template-columns: 1fr; gap: 16px; }
+  
+  .btn { width: 100%; justify-content: center; margin-bottom: 8px; }
+  .flex-center { flex-direction: column; gap: 12px; }
+  
+  .heading-xl { font-size: 2.2rem; }
+  .heading-lg { font-size: 1.8rem; }
+  .heading-md { font-size: 1.2rem; }
+  
+  /* Upload Zone Adjustments */
+  .upload-zone { padding: 32px 16px; }
+  .upload-zone-icon { font-size: 2.5rem; }
+  .upload-zone-text { font-size: 0.9rem; }
+  
+  /* Batch Slot Adjustments */
+  .batch-slot { grid-template-columns: 1fr; gap: 8px; align-items: flex-start; }
+  .batch-slot-label { margin-bottom: 4px; }
+  
+  /* File Item text truncation */
+  .file-item-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  
+  /* Table wrapping fix */
+  .data-table-wrapper { border-right: none; border-left: none; border-radius: 0; margin-left: -16px; margin-right: -16px; width: calc(100% + 32px); }
+  .data-table th, .data-table td { padding: 10px 12px; font-size: 0.8rem; }
 }
 
 @media (max-width: 480px) {
+  /* Hide step text, only show numbers on small screens to save space */
   .step span:not(.step-number) { display: none; }
-  .step { padding: 8px; }
-  .heading-xl { font-size: 2rem; }
+  .step { padding: 6px; }
+  .step-number { width: 26px; height: 26px; font-size: 0.75rem; }
+  
+  .heading-xl { font-size: 1.8rem; }
+  .heading-lg { font-size: 1.5rem; }
+  
   .verify-field { flex-direction: column; align-items: flex-start; gap: 4px; }
   .verify-field-value { text-align: left; }
+  
+  /* Background orbs tuning for mobile performance */
+  .orb { filter: blur(60px); opacity: 0.2; }
+  .orb-1 { width: 250px; height: 250px; }
+  .orb-2 { width: 200px; height: 200px; }
+  .orb-3 { width: 150px; height: 150px; }
 }
