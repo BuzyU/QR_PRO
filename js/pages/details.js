@@ -136,6 +136,10 @@ function isValidFile(file) {
 
 function addFiles(files) {
   uploadedFiles.push(...files);
+  // Sort alphabetically by filename immediately so browser's arbitrary
+  // file order never leaks into the pipeline. This is the single source
+  // of truth for file ordering throughout the entire app.
+  uploadedFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   renderFileList();
   handleFileParsing();
 }

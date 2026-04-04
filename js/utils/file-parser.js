@@ -65,7 +65,12 @@ export function detectUrnColumn(headers) {
 export async function parseAndMergeFiles(files, nameCol, urnCol) {
   const allStudents = [];
 
-  for (const file of files) {
+  // Defensive sort: guarantee alphabetical order even if caller didn't sort
+  const sortedFiles = [...files].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true })
+  );
+
+  for (const file of sortedFiles) {
     const { rows } = await parseFile(file);
     for (const row of rows) {
       const name = String(row[nameCol] || '').trim();
