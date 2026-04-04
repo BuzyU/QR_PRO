@@ -264,7 +264,7 @@ async function handleContinue() {
   state.institutionName = institutionName;
   state.eventName = eventName;
   state.year = year;
-  state.files = uploadedFiles;
+  state.files = [...uploadedFiles];
   state.nameCol = nameCol;
   state.urnCol = urnCol;
 

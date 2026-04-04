@@ -65,19 +65,25 @@ export function renderDownload(container) {
           <h3 class="heading-md mb-16">📂 Download by Batch</h3>
           ${Object.entries(batchGroups)
             .map(
-              ([num, batchTickets]) => `
+              ([num, batchTickets]) => {
+                const batch = batches[num - 1];
+                const label = batch?.sourceFilename
+                  ? batch.sourceFilename.replace(/\.[^/.]+$/, '')
+                  : `Batch ${num}`;
+                return `
             <div class="flex flex-between" style="align-items:center; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
               <div>
-                <span style="font-weight: 600;">Batch ${num}</span>
+                <span style="font-weight: 600;">${label}</span>
                 <span class="text-muted" style="font-size: 0.8rem; margin-left: 8px;">
-                  ${batchTickets.length} tickets · ${batches[num - 1]?.timeSlot || ''}
+                  ${batchTickets.length} tickets · ${batch?.timeSlot || ''}
                 </span>
               </div>
               <button class="btn btn-outline btn-sm batch-download-btn" data-batch="${num}">
                 Download
               </button>
             </div>
-          `
+          `;
+              }
             )
             .join('')}
         </div>
