@@ -79,3 +79,7 @@ The application will typically be accessible at `http://localhost:5173`.
 4. **Generate**: The system will securely log the ticket records to the Supabase database and generate the PDF tickets with embedded QR codes.
 5. **Download**: Once processing is complete, download the consolidated ZIP file containing all the individual PDF tickets.
 6. **Verify**: When attendees present their tickets, scan the QR code using any standard smartphone camera. It will direct you to the `/verify.html` portal, which will query the database and display a "Verified" or "Invalid" status.
+
+## License
+
+This project is open-source and available under the [MIT License](LICENSE).
