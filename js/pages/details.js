@@ -135,7 +135,18 @@ function isValidFile(file) {
 }
 
 function addFiles(files) {
-  uploadedFiles.push(...files);
+  // Deduplicate: skip files already in the list (matched by name + size + lastModified)
+  for (const file of files) {
+    const isDuplicate = uploadedFiles.some(
+      (existing) =>
+        existing.name === file.name &&
+        existing.size === file.size &&
+        existing.lastModified === file.lastModified
+    );
+    if (!isDuplicate) {
+      uploadedFiles.push(file);
+    }
+  }
   // Sort alphabetically by filename immediately so browser's arbitrary
   // file order never leaks into the pipeline. This is the single source
   // of truth for file ordering throughout the entire app.

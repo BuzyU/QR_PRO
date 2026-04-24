@@ -21,8 +21,30 @@ export async function parseFile(file) {
           return;
         }
 
-        const headers = Object.keys(jsonData[0]);
-        resolve({ headers, rows: jsonData });
+        // Filter out rows where every cell is empty/whitespace
+        const validRows = jsonData.filter(row =>
+          Object.values(row).some(v => String(v).trim() !== '')
+        );
+
+        if (validRows.length === 0) {
+          reject(new Error(`File "${file.name}" has headers but no valid data rows.`));
+          return;
+        }
+
+        // Normalize headers by stripping BOM and trimming whitespace
+        const rawHeaders = Object.keys(jsonData[0]);
+        const headers = rawHeaders.map(h => h.replace(/^\uFEFF/, '').trim());
+
+        // Re-key rows if headers were normalized
+        const normalizedRows = validRows.map(row => {
+          const newRow = {};
+          rawHeaders.forEach((raw, i) => {
+            newRow[headers[i]] = row[raw];
+          });
+          return newRow;
+        });
+
+        resolve({ headers, rows: normalizedRows });
       } catch (err) {
         reject(new Error(`Failed to parse "${file.name}": ${err.message}`));
       }
@@ -37,20 +59,47 @@ export async function parseFile(file) {
  * Auto-detect the "name" column from headers.
  */
 export function detectNameColumn(headers) {
-  const namePatterns = ['name', 'student name', 'student_name', 'studentname', 'full name', 'fullname'];
-  for (const h of headers) {
-    if (namePatterns.includes(h.toLowerCase().trim())) return h;
+  // Priority-ordered regex patterns — first match wins
+  const namePatterns = [
+    /^student[\s_-]*name$/i,
+    /^full[\s_-]*name$/i,
+    /^participant[\s_-]*name$/i,
+    /^candidate[\s_-]*name$/i,
+    /^name$/i,
+    /name/i,  // broad fallback: any column containing "name"
+  ];
+
+  for (const pattern of namePatterns) {
+    const match = headers.find(h => pattern.test(h.trim()));
+    if (match) return match;
   }
-  return headers[0]; // fallback to first column
+  return headers[0]; // ultimate fallback to first column
 }
 
 /**
  * Auto-detect the "URN" column from headers.
  */
 export function detectUrnColumn(headers) {
-  const urnPatterns = ['urn', 'roll', 'roll no', 'roll_no', 'rollno', 'registration', 'reg no', 'reg_no', 'id', 'student id'];
-  for (const h of headers) {
-    if (urnPatterns.includes(h.toLowerCase().trim())) return h;
+  // Priority-ordered regex patterns — first match wins
+  const urnPatterns = [
+    /^urn$/i,
+    /^roll[\s_-]*no\.?$/i,
+    /^roll$/i,
+    /^reg(istration)?[\s_-]*(no\.?|number)?$/i,
+    /^enrollment[\s_-]*(no\.?|number)?$/i,
+    /^enroll(ment)?$/i,
+    /^student[\s_-]*id$/i,
+    /^admission[\s_-]*(no\.?|number)?$/i,
+    /^id$/i,
+    /^prn$/i,
+    /^seat[\s_-]*(no\.?|number)?$/i,
+    /\burn\b/i,   // broad fallback: any column containing "urn"
+    /\broll\b/i,  // broad fallback: any column containing "roll"
+  ];
+
+  for (const pattern of urnPatterns) {
+    const match = headers.find(h => pattern.test(h.trim()));
+    if (match) return match;
   }
   return null; // no URN column found
 }

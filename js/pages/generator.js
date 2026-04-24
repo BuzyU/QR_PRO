@@ -78,7 +78,7 @@ function renderConfigPanel(students) {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="batch-count">Number of Batches</label>
-          <input class="form-input" type="number" id="batch-count" min="1" max="50" value="1">
+          <input class="form-input" type="number" id="batch-count" min="1" value="1">
         </div>
         <div class="form-group">
           <label class="form-label" for="assign-mode">Assignment Mode</label>
@@ -129,20 +129,23 @@ function renderConfigPanel(students) {
   const assignModeInput = document.getElementById('assign-mode');
 
   function updateBatchCountState() {
+    const maxBatches = students.length; // can't have more batches than students
     if (assignModeInput.value === 'asis' && uniqueFiles.length > 0) {
       batchCountInput.value = uniqueFiles.length;
       batchCountInput.disabled = true;
     } else {
       batchCountInput.disabled = false;
+      batchCountInput.max = maxBatches;
     }
-    const count = Math.max(1, Math.min(50, parseInt(batchCountInput.value) || 1));
+    const count = Math.max(1, Math.min(maxBatches, parseInt(batchCountInput.value) || 1));
     updateTimeSlots(count, assignModeInput.value === 'asis' ? uniqueFiles : []);
   }
 
   assignModeInput.addEventListener('change', updateBatchCountState);
 
   batchCountInput.addEventListener('input', (e) => {
-    const count = Math.max(1, Math.min(50, parseInt(e.target.value) || 1));
+    const maxBatches = students.length;
+    const count = Math.max(1, Math.min(maxBatches, parseInt(e.target.value) || 1));
     updateTimeSlots(count, assignModeInput.value === 'asis' ? uniqueFiles : []);
   });
 
