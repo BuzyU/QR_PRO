@@ -13,6 +13,7 @@ import adminRouter from './routes/admin.js';
 import profileRouter from './routes/profile.js';
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (Render/Vercel) for rate limiting
 
 // --- Global Middleware ---
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
