@@ -10,7 +10,7 @@
  * @param {string} params.institution - institution name
  * @returns {string} HTML email content
  */
-export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, institution }) {
+export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, institution, qrBase64 }) {
   // Build dynamic field rows
   const fieldRows = (visibleFields || [])
     .map((field) => {
@@ -70,7 +70,7 @@ export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, insti
 
       <!-- QR Code -->
       <div style="text-align:center;margin:28px 0;">
-        <img src="cid:qrcode" alt="QR Code" width="180" height="180"
+        <img src="data:image/png;base64,${qrBase64 || ''}" alt="QR Code" width="180" height="180"
           style="border:4px solid #f0f0f5;border-radius:12px;">
         <p style="margin:12px 0 0;font-size:11px;color:#aaa;">Scan to verify authenticity</p>
       </div>

@@ -85,9 +85,9 @@ async function loadProfile() {
 
     <!-- SMTP Section -->
     <div class="glass-card-static animate-in animate-in-delay-2 mb-24">
-      <h3 class="heading-md mb-8">📧 Gmail SMTP</h3>
+      <h3 class="heading-md mb-8">📧 Email Settings (Resend)</h3>
       <p class="text-muted mb-16" style="font-size:0.82rem;">
-        Configure your Gmail to send hall ticket emails. Requires a Gmail App Password.
+        Configure Resend to send hall ticket emails. Requires a free Resend API Key.
         <a href="#/setup" style="color:var(--color-primary-light);">See setup guide →</a>
       </p>
       ${profile?.smtp_configured ? `
@@ -102,12 +102,12 @@ async function loadProfile() {
         </div>
       `}
       <div class="form-group mt-16">
-        <label class="form-label" for="smtp-email">Gmail Address</label>
-        <input class="form-input" type="email" id="smtp-email" placeholder="you@gmail.com">
+        <label class="form-label" for="smtp-email">From Email Address</label>
+        <input class="form-input" type="email" id="smtp-email" placeholder="e.g. delivered@resend.dev">
       </div>
       <div class="form-group">
-        <label class="form-label" for="smtp-pass">App Password</label>
-        <input class="form-input" type="password" id="smtp-pass" placeholder="16-character app password">
+        <label class="form-label" for="smtp-pass">Resend API Key</label>
+        <input class="form-input" type="password" id="smtp-pass" placeholder="re_...">
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" id="test-smtp">📤 Test Connection</button>

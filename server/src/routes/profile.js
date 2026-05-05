@@ -19,7 +19,7 @@ router.get('/profile', (req, res) => {
     try {
       const parsed = JSON.parse(decrypt(profile.smtp_config));
       profile.smtp_configured = true;
-      profile.smtp_email = parsed.user ? maskEmail(parsed.user) : null;
+      profile.smtp_email = parsed.from_email ? maskEmail(parsed.from_email) : null;
     } catch {
       profile.smtp_configured = !!profile.smtp_config;
       profile.smtp_email = null;
@@ -59,16 +59,16 @@ router.put('/profile', async (req, res) => {
  */
 router.put('/profile/smtp', async (req, res) => {
   try {
-    const { gmail_user, gmail_app_password } = req.body;
+    const { from_email, resend_key } = req.body;
 
-    if (!gmail_user || !gmail_app_password) {
-      return res.status(400).json({ error: 'Gmail address and App Password required' });
+    if (!from_email || !resend_key) {
+      return res.status(400).json({ error: 'From Email and Resend API Key required' });
     }
 
     // Encrypt credentials
     const encrypted = encrypt(JSON.stringify({
-      user: gmail_user,
-      pass: gmail_app_password,
+      from_email,
+      resend_key,
     }));
 
     const { error } = await supabase
@@ -88,17 +88,17 @@ router.put('/profile/smtp', async (req, res) => {
  */
 router.post('/profile/smtp/test', async (req, res) => {
   try {
-    const { gmail_user, gmail_app_password } = req.body;
+    const { from_email, resend_key } = req.body;
 
-    if (!gmail_user || !gmail_app_password) {
-      return res.status(400).json({ error: 'Gmail address and App Password required' });
+    if (!from_email || !resend_key) {
+      return res.status(400).json({ error: 'From Email and Resend API Key required' });
     }
 
-    const result = await sendTestEmail(gmail_user, gmail_app_password);
+    const result = await sendTestEmail(resend_key, from_email);
     if (result.success) {
       res.json({ success: true, message: 'Test email sent! Check your inbox.' });
     } else {
-      res.status(400).json({ error: `SMTP test failed: ${result.error}` });
+      res.status(400).json({ error: `Email test failed: ${result.error}` });
     }
   } catch (err) {
     res.status(500).json({ error: 'Test failed' });

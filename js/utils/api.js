@@ -98,17 +98,17 @@ export async function updateProfile(data) {
   });
 }
 
-export async function saveSMTP(gmailUser, gmailAppPassword) {
+export async function saveSMTP(fromEmail, resendKey) {
   return apiRequest('/api/profile/smtp', {
     method: 'PUT',
-    body: JSON.stringify({ gmail_user: gmailUser, gmail_app_password: gmailAppPassword }),
+    body: JSON.stringify({ from_email: fromEmail, resend_key: resendKey }),
   });
 }
 
-export async function testSMTP(gmailUser, gmailAppPassword) {
+export async function testSMTP(fromEmail, resendKey) {
   return apiRequest('/api/profile/smtp/test', {
     method: 'POST',
-    body: JSON.stringify({ gmail_user: gmailUser, gmail_app_password: gmailAppPassword }),
+    body: JSON.stringify({ from_email: fromEmail, resend_key: resendKey }),
   });
 }
 

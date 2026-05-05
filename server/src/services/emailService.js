@@ -1,21 +1,14 @@
-import { createTransport } from 'nodemailer';
+import { Resend } from 'resend';
 import { supabase } from '../config/supabase.js';
 import { decrypt } from '../config/crypto.js';
 import { generateQRBuffer } from './qrService.js';
 import { buildEmailHTML } from '../templates/hallTicketEmail.js';
 
 /**
- * Send a hall ticket email using the user's configured SMTP credentials.
+ * Send a hall ticket email using Resend (HTTP-based, works on all hosting).
  *
- * @param {Object} params
- * @param {string} params.ticketId - ticket UUID
- * @param {string} params.to - recipient email
- * @param {string} params.name - recipient name
- * @param {Object} params.metadata - all custom fields
- * @param {string} params.verifyURL - verification URL
- * @param {Object} params.userProfile - user_profiles row (has smtp_config)
- * @param {Object} params.visibleFields - fields marked visible on ticket
- * @returns {Promise<{success: boolean, error?: string}>}
+ * Users configure a Resend API key + their "from" email in their profile.
+ * Resend uses HTTPS — no SMTP port blocking issues on Render/Vercel/etc.
  */
 export async function sendTicketEmail({
   ticketId,
@@ -26,64 +19,55 @@ export async function sendTicketEmail({
   userProfile,
   visibleFields,
 }) {
-  // Decrypt SMTP credentials
-  const smtpConfig = userProfile.smtp_config;
-  if (!smtpConfig) {
-    return { success: false, error: 'SMTP not configured' };
+  const emailConfig = userProfile.smtp_config;
+  if (!emailConfig) {
+    return { success: false, error: 'Email not configured' };
   }
 
-  let smtpUser, smtpPass;
+  let config;
   try {
-    const decrypted = JSON.parse(decrypt(smtpConfig));
-    smtpUser = decrypted.user;
-    smtpPass = decrypted.pass;
+    config = JSON.parse(decrypt(emailConfig));
   } catch {
-    return { success: false, error: 'Failed to decrypt SMTP credentials' };
+    return { success: false, error: 'Failed to decrypt email credentials' };
   }
 
-  // Create transporter — use port 465 (SSL) for cloud hosting compatibility
-  const transporter = createTransport({
-    service: 'gmail',
-    auth: { user: smtpUser, pass: smtpPass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
-
-  // Generate QR code buffer for inline attachment
-  const qrBuffer = await generateQRBuffer(verifyURL);
-
-  // Build email HTML
   const institution = userProfile.institution_name || 'QR PRO';
+
+  // Generate QR code
+  const qrBuffer = await generateQRBuffer(verifyURL);
+  const qrBase64 = qrBuffer.toString('base64');
+
+  // Build email HTML (inline QR as base64 data URL since Resend doesn't support CID)
   const html = buildEmailHTML({
     name,
     metadata,
     visibleFields,
     verifyURL,
     institution,
+    qrBase64,
   });
 
-  const mailOptions = {
-    from: `"${institution}" <${smtpUser}>`,
-    to,
-    subject: `Your Hall Ticket — ${institution}`,
-    html,
-    attachments: [
-      {
-        filename: 'qrcode.png',
-        content: qrBuffer,
-        cid: 'qrcode',
-      },
-    ],
-  };
-
-  // Retry up to 3 times with exponential backoff
+  // Retry up to 3 times
   let lastError = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await transporter.sendMail(mailOptions);
+      const resend = new Resend(config.resend_key);
 
-      // Mark as sent in database
+      await resend.emails.send({
+        from: `${institution} <${config.from_email || 'tickets@resend.dev'}>`,
+        to: [to],
+        subject: `Your Hall Ticket — ${institution}`,
+        html,
+        attachments: [
+          {
+            filename: 'qrcode.png',
+            content: qrBase64,
+            contentType: 'image/png',
+          },
+        ],
+      });
+
+      // Mark as sent
       await supabase
         .from('students')
         .update({
@@ -98,12 +82,11 @@ export async function sendTicketEmail({
       lastError = err.message;
       console.error(`[Email] Attempt ${attempt}/3 failed for ${to}: ${err.message}`);
       if (attempt < 3) {
-        await sleep(Math.pow(4, attempt) * 1000); // 4s, 16s
+        await sleep(Math.pow(2, attempt) * 1000);
       }
     }
   }
 
-  // All retries failed — update DB
   await supabase
     .from('students')
     .update({ email_retries: 3 })
@@ -113,34 +96,30 @@ export async function sendTicketEmail({
 }
 
 /**
- * Send a test email to verify SMTP configuration.
- * @param {string} smtpUser
- * @param {string} smtpPass
- * @returns {Promise<{success: boolean, error?: string}>}
+ * Send a test email to verify Resend configuration.
  */
-export async function sendTestEmail(smtpUser, smtpPass) {
-  const transporter = createTransport({
-    service: 'gmail',
-    auth: { user: smtpUser, pass: smtpPass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
-
+export async function sendTestEmail(resendKey, fromEmail) {
   try {
-    await transporter.sendMail({
-      from: `"QR PRO Test" <${smtpUser}>`,
-      to: smtpUser,
-      subject: 'QR PRO — SMTP Test Successful',
+    const resend = new Resend(resendKey);
+
+    const { data, error } = await resend.emails.send({
+      from: `QR PRO Test <${fromEmail || 'onboarding@resend.dev'}>`,
+      to: [fromEmail || 'delivered@resend.dev'],
+      subject: 'QR PRO — Email Test Successful',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;text-align:center;">
-          <h2 style="color:#6c63ff;">SMTP Configuration Verified</h2>
-          <p style="color:#555;">Your Gmail SMTP is working correctly with QR PRO.</p>
+          <h2 style="color:#6c63ff;">Email Configuration Verified ✅</h2>
+          <p style="color:#555;">Your Resend API key is working correctly with QR PRO.</p>
           <p style="color:#999;font-size:12px;">This is an automated test email.</p>
         </div>
       `,
     });
-    return { success: true };
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, emailId: data?.id };
   } catch (err) {
     return { success: false, error: err.message };
   }
