@@ -33,18 +33,13 @@ export async function sendTicketEmail({
 
   const institution = userProfile.institution_name || 'QR PRO';
 
-  // Generate QR code
-  const qrBuffer = await generateQRBuffer(verifyURL);
-  const qrBase64 = qrBuffer.toString('base64');
-
-  // Build email HTML (inline QR as base64 data URL since Resend doesn't support CID)
+  // Build email HTML
   const html = buildEmailHTML({
     name,
     metadata,
     visibleFields,
     verifyURL,
     institution,
-    qrBase64,
   });
 
   // Retry up to 3 times
@@ -58,13 +53,6 @@ export async function sendTicketEmail({
         to: [to],
         subject: `Your Hall Ticket — ${institution}`,
         html,
-        attachments: [
-          {
-            filename: 'qrcode.png',
-            content: qrBase64,
-            contentType: 'image/png',
-          },
-        ],
       });
 
       if (error) {
