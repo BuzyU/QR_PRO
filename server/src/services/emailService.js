@@ -53,7 +53,7 @@ export async function sendTicketEmail({
     try {
       const resend = new Resend(config.resend_key);
 
-      await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: `${institution} <${config.from_email || 'tickets@resend.dev'}>`,
         to: [to],
         subject: `Your Hall Ticket — ${institution}`,
@@ -66,6 +66,13 @@ export async function sendTicketEmail({
           },
         ],
       });
+
+      if (error) {
+        if (error.statusCode === 429 || error.message?.toLowerCase().includes('quota') || error.message?.toLowerCase().includes('rate limit')) {
+          throw new Error('QUOTA_EXCEEDED');
+        }
+        throw new Error(error.message || 'Unknown Resend error');
+      }
 
       // Mark as sent
       await supabase
@@ -81,16 +88,31 @@ export async function sendTicketEmail({
     } catch (err) {
       lastError = err.message;
       console.error(`[Email] Attempt ${attempt}/3 failed for ${to}: ${err.message}`);
+      // Don't retry if it's a hard quota limit
+      if (lastError === 'QUOTA_EXCEEDED') break;
+      
       if (attempt < 3) {
         await sleep(Math.pow(2, attempt) * 1000);
       }
     }
   }
 
-  await supabase
-    .from('students')
-    .update({ email_retries: 3 })
-    .eq('id', ticketId);
+  // If quota exceeded, mark with retries = -1 to defer until tomorrow
+  if (lastError === 'QUOTA_EXCEEDED') {
+    await supabase
+      .from('students')
+      .update({ 
+        email_retries: -1, 
+        email_sent_at: new Date().toISOString() // record when it hit the limit
+      })
+      .eq('id', ticketId);
+  } else {
+    // Normal failure after 3 retries
+    await supabase
+      .from('students')
+      .update({ email_retries: 3 })
+      .eq('id', ticketId);
+  }
 
   return { success: false, error: lastError };
 }

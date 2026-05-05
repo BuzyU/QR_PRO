@@ -56,7 +56,7 @@ export async function recoverPendingEmails() {
 
   const { data: pending, error } = await supabase
     .from('students')
-    .select('id, email, student_name, metadata, token, user_id')
+    .select('id, email, student_name, metadata, token, user_id, email_retries, email_sent_at')
     .eq('email_sent', false)
     .not('email', 'is', null)
     .not('token', 'is', null)
@@ -73,9 +73,25 @@ export async function recoverPendingEmails() {
     return;
   }
 
-  console.log(`[Queue] Recovering ${pending.length} pending emails...`);
+  let recoveredCount = 0;
 
   for (const ticket of pending) {
+    // If ticket failed completely, skip
+    if (ticket.email_retries >= 3) {
+      continue;
+    }
+
+    // If ticket was deferred due to quota, check if 24h have passed
+    if (ticket.email_retries === -1) {
+      if (ticket.email_sent_at) {
+        const sentAt = new Date(ticket.email_sent_at).getTime();
+        const hoursPassed = (Date.now() - sentAt) / (1000 * 60 * 60);
+        if (hoursPassed < 24) {
+          continue; // still deferred
+        }
+      }
+    }
+
     // Fetch user profile for SMTP credentials
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -84,7 +100,7 @@ export async function recoverPendingEmails() {
       .single();
 
     if (!profile || !profile.smtp_config) {
-      console.warn(`[Queue] Skipping ticket ${ticket.id}: user has no SMTP configured`);
+      console.warn(`[Queue] Skipping ticket ${ticket.id}: user has no Email configured`);
       continue;
     }
 
@@ -99,7 +115,11 @@ export async function recoverPendingEmails() {
       userProfile: profile,
       visibleFields: profile.column_mapping?.fields?.filter((f) => f.visible_on_ticket) || [],
     });
+
+    recoveredCount++;
   }
+
+  console.log(`[Queue] Recovered ${recoveredCount} pending emails.`);
 }
 
 /**
