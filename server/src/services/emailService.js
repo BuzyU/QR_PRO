@@ -41,13 +41,13 @@ export async function sendTicketEmail({
     return { success: false, error: 'Failed to decrypt SMTP credentials' };
   }
 
-  // Create transporter
+  // Create transporter — use port 465 (SSL) for cloud hosting compatibility
   const transporter = createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    service: 'gmail',
     auth: { user: smtpUser, pass: smtpPass },
-    tls: { rejectUnauthorized: false },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   // Generate QR code buffer for inline attachment
@@ -120,11 +120,11 @@ export async function sendTicketEmail({
  */
 export async function sendTestEmail(smtpUser, smtpPass) {
   const transporter = createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    service: 'gmail',
     auth: { user: smtpUser, pass: smtpPass },
-    tls: { rejectUnauthorized: false },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   try {
