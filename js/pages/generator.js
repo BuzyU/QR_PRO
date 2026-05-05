@@ -242,6 +242,8 @@ async function handleGenerate(students) {
             year: state.year || null,
             batch_number: batch.batchNumber,
             time_slot: batch.timeSlot,
+            source: 'client',
+            user_id: state.currentUser?.uid || null,
           })
           .select('id')
           .single();

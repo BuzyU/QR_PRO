@@ -5,3 +5,5 @@ dist
 *.log
 *.csv
 *.xlsx
+server/node_modules
+server/.env
