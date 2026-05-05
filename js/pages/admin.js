@@ -1,5 +1,5 @@
 import { navigate, state } from '../app.js';
-import { wakeServer, uploadFileToServer, getTickets, resendEmail, getQueueStats, exportTickets } from '../utils/api.js';
+import { wakeServer, getTickets, resendEmail, getQueueStats, exportTickets } from '../utils/api.js';
 
 let serverStatus = 'unknown';
 
@@ -12,28 +12,55 @@ export function renderAdmin(container) {
           <div>
             <h1 class="heading-lg animate-in"><span class="text-gradient">Email Pipeline</span></h1>
             <p class="text-secondary animate-in animate-in-delay-1" style="font-size:0.9rem;">
-              Upload files or connect Google Forms for automated emailing.
+              Google Forms integration — tickets emailed automatically on submission.
             </p>
           </div>
           <div class="server-status animate-in" id="server-status">
             <span class="server-dot"></span><span class="server-label">Checking...</span>
           </div>
         </div>
+
+        <!-- Google Forms Status -->
         <div class="glass-card-static animate-in animate-in-delay-2 mt-32">
-          <h3 class="heading-md mb-8">📤 Server Upload</h3>
+          <h3 class="heading-md mb-8">🔗 Google Forms Connection</h3>
           <p class="text-muted mb-16" style="font-size:0.82rem;">
-            Upload CSV/Excel. Configure column mapping in <a href="#/profile" style="color:var(--color-primary-light);">Profile</a> first.
+            Connect a Google Form so tickets are generated and emailed automatically when someone submits a response.
           </p>
-          <div class="upload-zone" id="admin-upload-zone">
-            <span class="upload-zone-icon">📁</span>
-            <p class="upload-zone-text">Drop file here or click to browse</p>
+          <div class="setup-checklist">
+            <div class="checklist-item">
+              <span class="checklist-icon" id="check-smtp">○</span>
+              <span>SMTP configured — <a href="#/profile" style="color:var(--color-primary-light);">Profile → Gmail SMTP</a></span>
+            </div>
+            <div class="checklist-item">
+              <span class="checklist-icon" id="check-mapping">○</span>
+              <span>Column mapping set — <a href="#/profile" style="color:var(--color-primary-light);">Profile → Column Mapping</a></span>
+            </div>
+            <div class="checklist-item">
+              <span class="checklist-icon" id="check-apikey">○</span>
+              <span>API key copied to Apps Script — <a href="#/setup" style="color:var(--color-primary-light);">Setup Guide</a></span>
+            </div>
           </div>
-          <input type="file" id="admin-file-input" accept=".csv,.xlsx,.xls" style="display:none;">
-          <div id="admin-upload-result" class="mt-16"></div>
+          <a href="#/setup" class="btn btn-primary btn-sm mt-16" style="display:inline-flex;text-decoration:none;">
+            📖 Open Setup Guide
+          </a>
         </div>
+
+        <!-- Queue Stats -->
         <div class="glass-card-static animate-in animate-in-delay-3 mt-24">
           <div class="flex flex-between" style="align-items:center;">
-            <h3 class="heading-md">🎫 Tickets</h3>
+            <h3 class="heading-md">📊 Queue Status</h3>
+            <button class="btn btn-outline btn-sm" id="refresh-stats">↻ Refresh</button>
+          </div>
+          <div class="stats-grid mt-16" id="queue-stats">
+            <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending</div></div>
+            <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Active</div></div>
+          </div>
+        </div>
+
+        <!-- Ticket List -->
+        <div class="glass-card-static animate-in animate-in-delay-4 mt-24">
+          <div class="flex flex-between" style="align-items:center;flex-wrap:wrap;gap:12px;">
+            <h3 class="heading-md">🎫 Generated Tickets</h3>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-outline btn-sm" id="export-csv">📥 Export</button>
               <button class="btn btn-outline btn-sm" id="refresh-tickets">↻</button>
@@ -52,13 +79,58 @@ export function renderAdmin(container) {
 async function init() {
   const el = document.getElementById('server-status');
   if (el) el.innerHTML = '<span class="server-dot waking"></span><span>Waking...</span>';
+  serverStatus = 'waking';
   const ok = await wakeServer();
   serverStatus = ok ? 'awake' : 'asleep';
   if (el) el.innerHTML = ok
     ? '<span class="server-dot awake"></span><span>Online</span>'
     : '<span class="server-dot asleep"></span><span>Offline</span>';
+
+  if (ok) {
+    loadQueueStats();
+    updateChecklist();
+  }
   setupListeners();
   loadTickets(1);
+}
+
+async function updateChecklist() {
+  try {
+    const { profile } = await (await fetch(`${getServerUrl()}/api/profile`, {
+      headers: { Authorization: `Bearer ${state.currentUser?.uid || ''}` },
+    })).json();
+
+    if (profile) {
+      setCheck('check-smtp', !!profile.smtp_configured);
+      setCheck('check-mapping', !!(profile.column_mapping?.name_field));
+      setCheck('check-apikey', !!profile.api_key);
+    }
+  } catch { /* server offline */ }
+}
+
+function setCheck(id, ok) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.textContent = ok ? '✓' : '○';
+    el.style.color = ok ? 'var(--color-success)' : 'var(--text-muted)';
+  }
+}
+
+function getServerUrl() {
+  return 'https://qr-pro-server.onrender.com';
+}
+
+async function loadQueueStats() {
+  try {
+    const stats = await getQueueStats();
+    const c = document.getElementById('queue-stats');
+    if (c) {
+      c.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${stats.pending || 0}</div><div class="stat-label">Pending</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.active || 0}</div><div class="stat-label">Active</div></div>
+      `;
+    }
+  } catch { /* offline */ }
 }
 
 async function loadTickets(page) {
@@ -67,7 +139,7 @@ async function loadTickets(page) {
   try {
     const r = await getTickets(page);
     const t = r.tickets || [];
-    if (!t.length) { w.innerHTML = '<p class="text-muted text-center" style="padding:24px;">No tickets yet.</p>'; return; }
+    if (!t.length) { w.innerHTML = '<p class="text-muted text-center" style="padding:24px;">No tickets yet. Connect a Google Form to get started.</p>'; return; }
     let h = '<div class="data-table-wrapper"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Scans</th><th></th></tr></thead><tbody>';
     t.forEach(tk => {
       const badge = tk.email_sent ? '<span class="badge badge-success">Sent</span>' : '<span class="badge badge-pending">Pending</span>';
@@ -83,13 +155,7 @@ async function loadTickets(page) {
 }
 
 function setupListeners() {
-  const zone = document.getElementById('admin-upload-zone');
-  const fi = document.getElementById('admin-file-input');
-  zone?.addEventListener('click', () => fi?.click());
-  zone?.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone?.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone?.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) doUpload(e.dataTransfer.files[0]); });
-  fi?.addEventListener('change', e => { if (e.target.files[0]) doUpload(e.target.files[0]); e.target.value = ''; });
+  document.getElementById('refresh-stats')?.addEventListener('click', loadQueueStats);
   document.getElementById('refresh-tickets')?.addEventListener('click', () => loadTickets(1));
   document.getElementById('export-csv')?.addEventListener('click', async () => {
     try {
@@ -101,15 +167,4 @@ function setupListeners() {
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download = 'tickets.csv'; a.click();
     } catch(e) { alert(e.message); }
   });
-}
-
-async function doUpload(file) {
-  const res = document.getElementById('admin-upload-result');
-  if (serverStatus !== 'awake') { res.innerHTML = '<p class="auth-error">Server offline</p>'; return; }
-  res.innerHTML = '<p class="text-muted">Uploading...</p>';
-  try {
-    const r = await uploadFileToServer(file, { event: '', year: '' });
-    res.innerHTML = `<p class="auth-success">✅ ${r.totalRecords} records queued.</p>`;
-    setTimeout(() => loadTickets(1), 3000);
-  } catch(e) { res.innerHTML = `<p class="auth-error">❌ ${e.message}</p>`; }
 }

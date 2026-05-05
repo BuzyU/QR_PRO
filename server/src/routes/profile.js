@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { firebaseAuth } from '../middleware/firebaseAuth.js';
 import { supabase } from '../config/supabase.js';
-import { encrypt } from '../config/crypto.js';
+import { encrypt, decrypt } from '../config/crypto.js';
 import { sendTestEmail } from '../services/emailService.js';
 
 const router = Router();
