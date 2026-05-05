@@ -137,10 +137,38 @@ router.get('/export', async (req, res) => {
 });
 
 /**
- * GET /api/queue-stats — current queue statistics
+ * GET /api/queue-stats — current queue statistics (database-backed)
  */
-router.get('/queue-stats', (req, res) => {
-  res.json(getStats());
+router.get('/queue-stats', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('students')
+      .select('email_sent, email_retries')
+      .eq('user_id', req.userId);
+
+    let sent = 0;
+    let deferred = 0;
+    let failed = 0;
+    let pending = 0; // In queue or waiting for retry (retries 0-2)
+
+    if (data) {
+      data.forEach(t => {
+        if (t.email_sent) {
+          sent++;
+        } else if (t.email_retries === -1) {
+          deferred++;
+        } else if (t.email_retries >= 3) {
+          failed++;
+        } else {
+          pending++;
+        }
+      });
+    }
+
+    res.json({ sent, deferred, failed, pending });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch queue stats' });
+  }
 });
 
 export default router;

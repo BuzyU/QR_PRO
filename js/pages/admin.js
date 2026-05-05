@@ -51,9 +51,11 @@ export function renderAdmin(container) {
             <h3 class="heading-md">📊 Queue Status</h3>
             <button class="btn btn-outline btn-sm" id="refresh-stats">↻ Refresh</button>
           </div>
-          <div class="stats-grid mt-16" id="queue-stats">
+          <div class="stats-grid mt-16" id="queue-stats" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));">
+            <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Sent</div></div>
             <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending</div></div>
-            <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Active</div></div>
+            <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Deferred (Quota)</div></div>
+            <div class="stat-card"><div class="stat-value" style="color:var(--color-danger)">—</div><div class="stat-label">Failed</div></div>
           </div>
         </div>
 
@@ -126,8 +128,10 @@ async function loadQueueStats() {
     const c = document.getElementById('queue-stats');
     if (c) {
       c.innerHTML = `
-        <div class="stat-card"><div class="stat-value">${stats.pending || 0}</div><div class="stat-label">Pending</div></div>
-        <div class="stat-card"><div class="stat-value">${stats.active || 0}</div><div class="stat-label">Active</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--color-success)">${stats.sent || 0}</div><div class="stat-label">Emails Sent</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.pending || 0}</div><div class="stat-label">Processing</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--color-warning)">${stats.deferred || 0}</div><div class="stat-label">Deferred (Quota)</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--color-danger)">${stats.failed || 0}</div><div class="stat-label">Failed</div></div>
       `;
     }
   } catch { /* offline */ }
