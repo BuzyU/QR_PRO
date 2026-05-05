@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "build": "echo 'No build step needed for Node.js server'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
