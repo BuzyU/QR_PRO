@@ -3,7 +3,7 @@
  * Handles server communication with wake-up detection, retries, and auth headers.
  */
 
-const SERVER_URL = 'https://qr-pro-server.onrender.com'; // Update after Render deploy
+const SERVER_URL = 'https://qr-pro-server.onrender.com';
 
 let _serverAwake = false;
 let _lastPing = 0;
