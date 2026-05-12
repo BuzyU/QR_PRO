@@ -107,6 +107,7 @@ function renderContent(eventId) {
       <button class="event-tab" data-tab="ticket-tpl">Ticket / PDF</button>
       <button class="event-tab" data-tab="tickets">Tickets</button>
       <button class="event-tab" data-tab="attendance">Attendance</button>
+      <button class="event-tab" data-tab="integrations">Integrations</button>
     </div>
 
     <!-- Tab Content -->
@@ -163,6 +164,11 @@ function renderTab(tab, eventId) {
     case 'attendance':
       renderAttendanceTab(container, eventId);
       break;
+    case 'integrations':
+      renderIntegrationsTab(container, eventId);
+      break;
+    default:
+      container.innerHTML = '<p>Unknown tab</p>';
   }
 }
 
@@ -901,3 +907,134 @@ async function exportAttendance(eventId) {
     alert('Export failed: ' + err.message);
   }
 }
+
+// ─── Integrations Tab ────────────────────────────────────────────────
+async function renderIntegrationsTab(container, eventId) {
+  container.innerHTML = `
+    <div class="glass-card-static">
+      <div class="text-center" style="padding: 24px;"><div class="spinner"></div></div>
+    </div>
+  `;
+
+  try {
+    const authHeader = await window.__qrProApp.state.currentUser?.getIdToken();
+    if (!authHeader) throw new Error('Not authenticated');
+
+    const res = await fetch(`${window.API_BASE_URL || ''}/api/profile`, {
+      headers: { Authorization: `Bearer ${authHeader}` }
+    });
+    const { profile } = await res.json();
+    const apiKey = profile?.api_key;
+
+    if (!apiKey) throw new Error('API Key not found');
+
+    const webhookUrl = `${window.API_BASE_URL || window.location.origin}/api/events/${eventId}/webhook?apiKey=${apiKey}`;
+
+    const appsScriptCode = `/**
+ * QR PRO - Google Forms Auto-Ticket Generator
+ * 
+ * Instructions:
+ * 1. Open your Google Form.
+ * 2. Click the 3 dots (top right) -> "Script editor".
+ * 3. Delete any code there and paste this entire script.
+ * 4. Click the "Save" icon (disk).
+ * 5. Click the "Triggers" clock icon on the left sidebar.
+ * 6. Click "Add Trigger" (bottom right).
+ * 7. Choose: "onFormSubmit", "Head", "From form", "On form submit".
+ * 8. Click "Save" and grant Google permissions.
+ */
+
+const WEBHOOK_URL = "${webhookUrl}";
+
+function onFormSubmit(e) {
+  try {
+    const formResponse = e.response;
+    const itemResponses = formResponse.getItemResponses();
+    
+    // Convert form answers into a JSON object
+    const payload = {};
+    for (let i = 0; i < itemResponses.length; i++) {
+      const item = itemResponses[i];
+      const question = item.getItem().getTitle();
+      const answer = item.getResponse();
+      payload[question] = answer;
+    }
+    
+    const options = {
+      'method' : 'post',
+      'contentType': 'application/json',
+      'payload' : JSON.stringify(payload)
+    };
+    
+    UrlFetchApp.fetch(WEBHOOK_URL, options);
+  } catch(error) {
+    console.error("Webhook Error: " + error.toString());
+  }
+}`;
+
+    container.innerHTML = `
+      <div class="glass-card-static animate-in">
+        <h3 class="heading-md mb-8">Google Forms Integration</h3>
+        <p class="text-muted mb-24" style="font-size: 0.88rem; max-width: 700px;">
+          Automatically generate tickets and send emails the moment someone fills out your Google Form. 
+          Make sure you have completed the <strong>Column Mapping</strong> tab first so the system knows which form questions correspond to the Student Name and Email.
+        </p>
+
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+          <h4 class="heading-sm mb-8" style="color: var(--color-primary-light);">Your Secure Webhook URL</h4>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="form-input" value="${webhookUrl}" readonly id="webhook-url-input" style="font-family: monospace; font-size: 0.8rem;" />
+            <button class="btn btn-outline" id="copy-webhook-btn">Copy</button>
+          </div>
+          <p class="text-muted mt-8" style="font-size: 0.75rem;">
+            ⚠️ Keep this URL secret! Anyone with this URL can generate tickets for your event.
+          </p>
+        </div>
+
+        <h4 class="heading-sm mb-12">Setup Instructions</h4>
+        <ol class="text-muted mb-24" style="font-size: 0.85rem; padding-left: 20px; line-height: 1.6;">
+          <li>Open your target Google Form.</li>
+          <li>Click the 3 vertical dots in the top right corner and select <strong>"Script editor"</strong>.</li>
+          <li>Delete any existing code in the editor, and paste the code block below.</li>
+          <li>Save the script (💾 icon).</li>
+          <li>Click the <strong>Triggers</strong> icon (clock) on the left sidebar.</li>
+          <li>Click <strong>+ Add Trigger</strong> in the bottom right corner.</li>
+          <li>Choose which function to run: <strong>onFormSubmit</strong></li>
+          <li>Select event type: <strong>On form submit</strong></li>
+          <li>Click <strong>Save</strong>. Google will ask you to authorize the script (Click Advanced -> Go to script).</li>
+        </ol>
+
+        <div style="position: relative;">
+          <h4 class="heading-sm mb-8">Apps Script Code</h4>
+          <button class="btn btn-sm btn-primary" id="copy-script-btn" style="position: absolute; right: 8px; top: 32px;">Copy Code</button>
+          <pre style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 0.8rem; border: 1px solid var(--border-color); white-space: pre-wrap;"><code id="apps-script-code">${escapeAttr(appsScriptCode)}</code></pre>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('copy-webhook-btn')?.addEventListener('click', () => {
+      const input = document.getElementById('webhook-url-input');
+      input.select();
+      document.execCommand('copy');
+      const btn = document.getElementById('copy-webhook-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+
+    document.getElementById('copy-script-btn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(appsScriptCode);
+      const btn = document.getElementById('copy-script-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy Code', 2000);
+    });
+
+  } catch (err) {
+    container.innerHTML = `
+      <div class="glass-card-static text-center" style="padding: 32px;">
+        <p style="color: var(--color-danger);">${err.message}</p>
+        <p class="text-muted mt-8" style="font-size: 0.8rem;">Please try reloading the page.</p>
+      </div>
+    `;
+  }
+}
+

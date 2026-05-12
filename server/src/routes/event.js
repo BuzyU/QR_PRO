@@ -11,13 +11,16 @@ import {
   encryptEmailConfig,
 } from '../services/gmailService.js';
 import { sendTestEmail as sendResendTestEmail } from '../services/emailService.js';
+import { apiKeyAuth } from '../middleware/apiKeyAuth.js';
+import { processEntry } from '../services/ticketService.js';
+import { addJob } from '../services/queueService.js';
+import { uploadLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
 // ─── Public Route (no auth) ─────────────────────────────────────────
 // Gmail OAuth callback — Google redirects the browser here directly.
 // Must be registered BEFORE the firebaseAuth middleware.
-
 router.get('/events/gmail/callback', async (req, res) => {
   try {
     const { code, state: eventId, error: oauthError } = req.query;
@@ -722,6 +725,101 @@ router.get('/events/gmail/callback', async (req, res) => {
     console.error('[GET /api/events/gmail/callback]', err.message);
     const eventId = req.query.state || '';
     res.redirect(`${env.frontendUrl}/#/event/${eventId}?gmail=error&reason=${encodeURIComponent(err.message)}`);
+  }
+});
+
+// ─── Webhook Route (API Key Auth) ───────────────────────────────────
+
+/**
+ * POST /api/events/:id/webhook
+ * Ingest ticket requests directly from Google Forms (or Zapier).
+ * Uses API Key authentication.
+ */
+router.post('/events/:id/webhook', uploadLimiter, apiKeyAuth, async (req, res) => {
+  try {
+    const { id: eventId } = req.params;
+    const { userId, userProfile } = req;
+    const row = req.body; // Expects JSON object representing a single row/submission
+
+    if (!row || typeof row !== 'object') {
+      return res.status(400).json({ error: 'Invalid payload. Expected JSON object.' });
+    }
+
+    // Fetch event config
+    const { data: event, error: eventErr } = await supabase
+      .from('events')
+      .select('id, name, status, column_mapping, custom_fields')
+      .eq('id', eventId)
+      .eq('user_id', userId)
+      .single();
+
+    if (eventErr || !event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    if (event.status === 'completed') {
+      return res.status(400).json({ error: `Event "${event.name}" is completed. No new tickets.` });
+    }
+
+    // Column mapping
+    const mapping = event.column_mapping || {};
+    const nameField = mapping.name_field;
+    const emailField = mapping.email_field;
+    const fieldMap = mapping.field_map || {};
+
+    if (!nameField || !emailField) {
+      return res.status(400).json({ error: 'Event mapping is incomplete. Setup Name and Email mapping first.' });
+    }
+
+    const name = row[nameField];
+    const email = row[emailField];
+
+    if (!name || !email) {
+      return res.status(400).json({ 
+        error: `Missing required fields in payload. Expected '${nameField}' and '${emailField}'.` 
+      });
+    }
+
+    // Map custom fields
+    const metadata = {};
+    for (const [fieldId, externalKey] of Object.entries(fieldMap)) {
+      if (row[externalKey] !== undefined) {
+        metadata[fieldId] = String(row[externalKey]);
+      }
+    }
+
+    // Process ticket
+    const result = await processEntry({
+      name: String(name),
+      email: String(email),
+      metadata,
+      userId,
+      eventId,
+      source: 'webhook',
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    // Add to email queue
+    const visibleFields = (mapping.fields || []).filter((f) => f.visible_on_ticket);
+
+    addJob({
+      ticketId: result.ticketId,
+      to: result.email,
+      name: result.name,
+      metadata: result.metadata,
+      verifyURL: result.verifyURL,
+      userProfile,
+      visibleFields,
+      eventId,
+    });
+
+    res.json({ success: true, message: 'Ticket generated and queued', ticketId: result.ticketId });
+  } catch (err) {
+    console.error('[POST /api/events/:id/webhook]', err.message);
+    res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
 
