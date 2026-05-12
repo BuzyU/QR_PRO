@@ -85,7 +85,7 @@ async function apiRequest(path, options = {}) {
   return data;
 }
 
-// --- Profile ---
+// ─── Profile ────────────────────────────────────────────────────────
 
 export async function getProfile() {
   return apiRequest('/api/profile');
@@ -134,7 +134,101 @@ export async function getTicketTemplate() {
   return apiRequest('/api/profile/ticket-template');
 }
 
-// --- Admin ---
+// ─── Events ─────────────────────────────────────────────────────────
+
+export async function getEvents() {
+  return apiRequest('/api/events');
+}
+
+export async function getEvent(eventId) {
+  return apiRequest(`/api/events/${eventId}`);
+}
+
+export async function createEvent(data) {
+  return apiRequest('/api/events', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateEvent(eventId, data) {
+  return apiRequest(`/api/events/${eventId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteEvent(eventId) {
+  return apiRequest(`/api/events/${eventId}`, { method: 'DELETE' });
+}
+
+export async function saveEventFields(eventId, custom_fields) {
+  return apiRequest(`/api/events/${eventId}/fields`, {
+    method: 'PUT',
+    body: JSON.stringify({ custom_fields }),
+  });
+}
+
+export async function saveEventColumnMapping(eventId, mapping) {
+  return apiRequest(`/api/events/${eventId}/column-mapping`, {
+    method: 'PUT',
+    body: JSON.stringify(mapping),
+  });
+}
+
+export async function saveEventEmailTemplate(eventId, email_template) {
+  return apiRequest(`/api/events/${eventId}/email-template`, {
+    method: 'PUT',
+    body: JSON.stringify({ email_template }),
+  });
+}
+
+export async function saveEventTicketTemplate(eventId, data) {
+  return apiRequest(`/api/events/${eventId}/ticket-template`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getEventTickets(eventId, page = 1, limit = 50) {
+  return apiRequest(`/api/events/${eventId}/tickets?page=${page}&limit=${limit}`);
+}
+
+export async function getEventAttendance(eventId) {
+  return apiRequest(`/api/events/${eventId}/attendance`);
+}
+
+// ─── Per-Event Email Delivery ───────────────────────────────────────
+
+export async function getEventEmailConfig(eventId) {
+  return apiRequest(`/api/events/${eventId}/email-config`);
+}
+
+export async function saveEventEmailConfig(eventId, config) {
+  return apiRequest(`/api/events/${eventId}/email-config`, {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  });
+}
+
+export async function getGmailAuthUrl(eventId) {
+  return apiRequest(`/api/events/${eventId}/gmail/auth-url`);
+}
+
+export async function testEventEmail(eventId, to) {
+  return apiRequest(`/api/events/${eventId}/email-config/test`, {
+    method: 'POST',
+    body: JSON.stringify({ to }),
+  });
+}
+
+export async function disconnectGmail(eventId) {
+  return apiRequest(`/api/events/${eventId}/gmail/disconnect`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Admin (legacy / global) ────────────────────────────────────────
 
 export async function getTickets(page = 1, limit = 50) {
   return apiRequest(`/api/tickets?page=${page}&limit=${limit}`);
@@ -156,7 +250,7 @@ export async function getQueueStats() {
   return apiRequest('/api/queue-stats');
 }
 
-// --- File Upload (server-side) ---
+// ─── File Upload (server-side) ──────────────────────────────────────
 
 export async function uploadFileToServer(file, metadata) {
   const formData = new FormData();
@@ -164,6 +258,7 @@ export async function uploadFileToServer(file, metadata) {
   if (metadata.institution) formData.append('institution', metadata.institution);
   if (metadata.event) formData.append('event', metadata.event);
   if (metadata.year) formData.append('year', metadata.year);
+  if (metadata.eventId) formData.append('eventId', metadata.eventId);
 
   return apiRequest('/api/upload', {
     method: 'POST',
@@ -171,7 +266,7 @@ export async function uploadFileToServer(file, metadata) {
   });
 }
 
-// --- Verification ---
+// ─── Verification ───────────────────────────────────────────────────
 
 export async function verifyToken(token) {
   const res = await fetch(`${SERVER_URL}/api/verify?token=${token}`);

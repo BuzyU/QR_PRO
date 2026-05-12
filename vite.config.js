@@ -7,6 +7,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         verify: resolve(__dirname, 'verify.html'),
+        scanner: resolve(__dirname, 'scanner.html'),
       },
     },
   },

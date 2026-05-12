@@ -11,6 +11,7 @@ import uploadRouter from './routes/upload.js';
 import verifyRouter from './routes/verify.js';
 import adminRouter from './routes/admin.js';
 import profileRouter from './routes/profile.js';
+import eventRouter from './routes/event.js';
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (Render/Vercel) for rate limiting
@@ -44,6 +45,7 @@ app.use('/api', uploadRouter);
 app.use('/api', verifyRouter);
 app.use('/api', adminRouter);
 app.use('/api', profileRouter);
+app.use('/api', eventRouter);
 
 // --- 404 Handler ---
 app.use((req, res) => {

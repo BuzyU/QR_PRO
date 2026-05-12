@@ -8,6 +8,7 @@ const router = Router();
 /**
  * GET /api/verify?token=XYZ
  * Public endpoint — verifies a ticket token via HMAC.
+ * Auto-marks attendance on first valid scan.
  */
 router.get('/verify', verifyLimiter, async (req, res) => {
   try {
@@ -33,13 +34,37 @@ router.get('/verify', verifyLimiter, async (req, res) => {
       return res.json({ status: 'INVALID', error: 'Signature verification failed' });
     }
 
-    // Increment scan count
+    // Fetch event info (if ticket has an event)
+    let eventInfo = null;
+    if (ticket.event_id) {
+      const { data: event } = await supabase
+        .from('events')
+        .select('name, description, custom_fields')
+        .eq('id', ticket.event_id)
+        .single();
+
+      if (event) {
+        eventInfo = event;
+      }
+    }
+
+    const isFirstScan = (ticket.scan_count || 0) === 0;
+    const newScanCount = (ticket.scan_count || 0) + 1;
+
+    // Update scan count + auto-mark present on first scan
+    const updates = {
+      scan_count: newScanCount,
+      last_scanned_at: new Date().toISOString(),
+    };
+
+    if (isFirstScan && ticket.attendance_status !== 'present') {
+      updates.attendance_status = 'present';
+      updates.attended_at = new Date().toISOString();
+    }
+
     await supabase
       .from('students')
-      .update({
-        scan_count: (ticket.scan_count || 0) + 1,
-        last_scanned_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', ticket.id);
 
     // Log the scan
@@ -49,20 +74,33 @@ router.get('/verify', verifyLimiter, async (req, res) => {
       user_agent: req.headers['user-agent'] || 'unknown',
     });
 
-    // Return ticket details (strip sensitive fields)
+    // Build visible fields from event config
+    const visibleFields = [];
+    if (eventInfo && eventInfo.custom_fields) {
+      for (const field of eventInfo.custom_fields) {
+        if (field.on_ticket) {
+          visibleFields.push({
+            label: field.label,
+            value: ticket.metadata?.[field.key] || '—',
+          });
+        }
+      }
+    }
+
+    // Return ticket details
     res.json({
       status: 'VERIFIED',
+      isFirstScan,
       ticket: {
         name: ticket.student_name,
-        urn: ticket.urn,
-        institution: ticket.institution_name,
-        event: ticket.event_name,
-        year: ticket.year,
-        batch: ticket.batch_number,
-        timeSlot: ticket.time_slot,
+        email: ticket.email,
+        event: eventInfo?.name || ticket.event_name || '',
+        fields: visibleFields,
         metadata: ticket.metadata || {},
-        scanCount: (ticket.scan_count || 0) + 1,
-        lastScanned: new Date().toISOString(),
+        scanCount: newScanCount,
+        attendanceStatus: isFirstScan ? 'present' : ticket.attendance_status,
+        attendedAt: isFirstScan ? updates.attended_at : ticket.attended_at,
+        lastScanned: updates.last_scanned_at,
         createdAt: ticket.created_at,
       },
     });

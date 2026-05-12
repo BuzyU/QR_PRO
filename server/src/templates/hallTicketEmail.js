@@ -1,24 +1,25 @@
 /**
  * Build the HTML email template for a hall ticket.
- * Dynamically renders all visible fields from the user's column mapping.
+ * Dynamically renders fields from the event's custom_fields config.
  *
  * @param {Object} params
- * @param {string} params.name - student name
- * @param {Object} params.metadata - all custom fields
- * @param {Array}  params.visibleFields - fields marked visible [{source, label}]
+ * @param {string} params.name - attendee name
+ * @param {Object} params.metadata - custom field values { key: value }
+ * @param {Array}  params.visibleFields - fields marked for email [{key, label, ...}]
  * @param {string} params.verifyURL - verification URL
- * @param {string} params.institution - institution name
+ * @param {string} params.eventName - event name
+ * @param {string} params.institution - institution name (from user profile)
  * @returns {string} HTML email content
  */
-export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, institution }) {
-  // Build dynamic field rows
+export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, eventName, institution }) {
+  // Build dynamic field rows from event's custom fields
   const fieldRows = (visibleFields || [])
     .map((field) => {
-      const value = metadata[field.source] || metadata[field.label] || '—';
+      const value = metadata[field.key] || metadata[field.source] || metadata[field.label] || '—';
       return `
         <tr>
           <td style="padding:10px 16px;font-size:13px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f0f0f0;width:40%;">
-            ${field.label || field.source}
+            ${field.label || field.key}
           </td>
           <td style="padding:10px 16px;font-size:14px;color:#1a1a2e;font-weight:600;border-bottom:1px solid #f0f0f0;">
             ${value}
@@ -27,6 +28,9 @@ export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, insti
       `;
     })
     .join('');
+
+  const headerTitle = institution || eventName || 'QR PRO';
+  const headerSubtitle = eventName && institution ? eventName : 'Hall Ticket';
 
   return `
 <!DOCTYPE html>
@@ -38,9 +42,9 @@ export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, insti
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#2a2478 0%,#6c63ff 100%);border-radius:16px 16px 0 0;padding:32px 24px;text-align:center;">
       <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">
-        ${institution}
+        ${headerTitle}
       </h1>
-      <p style="margin:8px 0 0;color:#c8c3ff;font-size:13px;">Hall Ticket</p>
+      <p style="margin:8px 0 0;color:#c8c3ff;font-size:13px;">${headerSubtitle}</p>
     </div>
 
     <!-- Body Card -->
@@ -87,7 +91,7 @@ export function buildEmailHTML({ name, metadata, visibleFields, verifyURL, insti
       <!-- Footer -->
       <div style="border-top:1px solid #f0f0f0;padding-top:20px;margin-top:24px;text-align:center;">
         <p style="margin:0;font-size:11px;color:#bbb;line-height:1.5;">
-          This is a computer-generated hall ticket from QR PRO.<br>
+          This is a computer-generated hall ticket from ${headerTitle}.<br>
           Do not reply to this email.
         </p>
       </div>

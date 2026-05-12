@@ -22,4 +22,5 @@ export const env = {
   hmacSecret: process.env.HMAC_SECRET,
   encryptionKey: process.env.ENCRYPTION_KEY,
   frontendUrl: process.env.FRONTEND_URL,
+  serverUrl: process.env.SERVER_URL || '', // e.g., https://qr-pro-server.onrender.com
 };

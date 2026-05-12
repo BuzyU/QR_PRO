@@ -25,6 +25,7 @@
 
 const API_KEY = 'YOUR_API_KEY_HERE';      // Get from QR PRO → Profile → API Key
 const SERVER_URL = 'YOUR_SERVER_URL_HERE'; // e.g., https://qr-pro-server.onrender.com
+const EVENT_ID = 'YOUR_EVENT_ID_HERE';     // Get from QR PRO → Events → click event → copy ID from URL
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FORM FIELD MAPPING                                      ║
@@ -103,7 +104,7 @@ function sendToServer(data) {
           'x-api-key': API_KEY,
           'User-Agent': 'QR-PRO-Apps-Script',
         },
-        payload: JSON.stringify(data),
+        payload: JSON.stringify({ ...data, event_id: EVENT_ID }),
         muteHttpExceptions: true,
       });
 
@@ -215,7 +216,7 @@ function testConfiguration() {
       method: 'post',
       contentType: 'application/json',
       headers: { 'x-api-key': API_KEY },
-      payload: JSON.stringify(testData),
+      payload: JSON.stringify({ test: 'configuration_check', event_id: EVENT_ID }),
       muteHttpExceptions: true,
     });
     Logger.log('API response (' + response.getResponseCode() + '): ' + response.getContentText());

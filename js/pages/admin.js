@@ -5,7 +5,7 @@ let serverStatus = 'unknown';
 
 export function renderAdmin(container) {
   container.innerHTML += `
-    <div class="bg-orbs"><div class="orb orb-1"></div></div>
+    </div>
     <div class="page-container">
       <div style="max-width:900px;margin:0 auto;">
         <div class="flex flex-between" style="align-items:center;flex-wrap:wrap;gap:12px;">

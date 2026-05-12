@@ -14,8 +14,7 @@ async function init() {
 
   // Show loading state
   app.innerHTML = `
-    <div class="bg-orbs">
-      <div class="orb orb-1"></div>
+    
       <div class="orb orb-2"></div>
     </div>
     <div class="page-center" style="position: relative; z-index: 1;">
@@ -28,10 +27,8 @@ async function init() {
 
   try {
     if (token) {
-      // NEW: Token-based verification via backend
       await verifyWithToken(app, token);
     } else {
-      // LEGACY: Direct Supabase lookup by UUID
       await verifyWithId(app, studentId);
     }
   } catch (err) {
@@ -41,14 +38,14 @@ async function init() {
 
 /**
  * Token-based verification via the Render backend.
- * Handles server cold-start with a loading message.
+ * Shows attendance status on first/repeat scans.
  */
 async function verifyWithToken(app, token) {
   try {
     const result = await verifyToken(token);
 
     if (result.status === 'VERIFIED') {
-      renderVerifiedToken(app, result.ticket);
+      renderVerifiedToken(app, result.ticket, result.isFirstScan);
     } else if (result.status === 'NOT_FOUND') {
       renderError(app, 'This QR code does not match any record. The ticket may be invalid or fabricated.');
     } else {
@@ -79,23 +76,61 @@ async function verifyWithId(app, studentId) {
 
 /**
  * Render verified state for token-based tickets.
- * Dynamically renders all metadata fields.
+ * Shows dynamic fields from event config + attendance status.
  */
-function renderVerifiedToken(app, ticket) {
-  // Build dynamic field rows from metadata
-  const metadata = ticket.metadata || {};
-  const metadataRows = Object.entries(metadata)
-    .map(([key, value]) => `
+function renderVerifiedToken(app, ticket, isFirstScan) {
+  // Build dynamic field rows from the event's visible fields
+  const fieldRows = (ticket.fields || [])
+    .map((f) => `
       <div class="verify-field">
-        <span class="verify-field-label">${key}</span>
-        <span class="verify-field-value">${value || '—'}</span>
+        <span class="verify-field-label">${f.label}</span>
+        <span class="verify-field-value">${f.value || '—'}</span>
       </div>
     `)
     .join('');
 
+  // Fallback: render metadata directly if no event fields available
+  const metadataRows = !ticket.fields?.length
+    ? Object.entries(ticket.metadata || {})
+        .map(([key, value]) => `
+          <div class="verify-field">
+            <span class="verify-field-label">${key}</span>
+            <span class="verify-field-value">${value || '—'}</span>
+          </div>
+        `)
+        .join('')
+    : '';
+
+  // Attendance status UI
+  const isPresent = ticket.attendanceStatus === 'present';
+  let attendanceBanner;
+
+  if (isFirstScan) {
+    attendanceBanner = `
+      <div class="attendance-banner attendance-granted">
+        <span class="attendance-icon">🟢</span>
+        <div>
+          <strong>Entry Granted</strong>
+          <span class="attendance-detail">First scan — welcome!</span>
+        </div>
+      </div>
+    `;
+  } else if (isPresent) {
+    attendanceBanner = `
+      <div class="attendance-banner attendance-warning">
+        <span class="attendance-icon">🟡</span>
+        <div>
+          <strong>Already Entered</strong>
+          <span class="attendance-detail">Checked in at ${ticket.attendedAt ? new Date(ticket.attendedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    attendanceBanner = '';
+  }
+
   app.innerHTML = `
-    <div class="bg-orbs">
-      <div class="orb orb-1"></div>
+    
       <div class="orb orb-2"></div>
     </div>
     <div class="page-center" style="position: relative; z-index: 1;">
@@ -108,41 +143,20 @@ function renderVerifiedToken(app, ticket) {
             </span>
           </div>
 
+          ${attendanceBanner}
+
           <div class="verify-field">
             <span class="verify-field-label">Name</span>
             <span class="verify-field-value">${ticket.name}</span>
           </div>
 
-          ${ticket.urn ? `
-          <div class="verify-field">
-            <span class="verify-field-label">URN</span>
-            <span class="verify-field-value">${ticket.urn}</span>
-          </div>` : ''}
-
-          ${ticket.institution ? `
-          <div class="verify-field">
-            <span class="verify-field-label">Institution</span>
-            <span class="verify-field-value">${ticket.institution}</span>
-          </div>` : ''}
-
           ${ticket.event ? `
           <div class="verify-field">
             <span class="verify-field-label">Event</span>
-            <span class="verify-field-value">${ticket.event}${ticket.year ? ' — ' + ticket.year : ''}</span>
+            <span class="verify-field-value">${ticket.event}</span>
           </div>` : ''}
 
-          ${ticket.batch ? `
-          <div class="verify-field">
-            <span class="verify-field-label">Batch</span>
-            <span class="verify-field-value">Batch ${ticket.batch}</span>
-          </div>` : ''}
-
-          ${ticket.timeSlot ? `
-          <div class="verify-field">
-            <span class="verify-field-label">Time Slot</span>
-            <span class="verify-field-value">${ticket.timeSlot}</span>
-          </div>` : ''}
-
+          ${fieldRows}
           ${metadataRows}
 
           <div class="verify-field" style="border-top: 1px solid var(--border-color); margin-top: 16px; padding-top: 16px;">
@@ -164,8 +178,7 @@ function renderVerifiedToken(app, ticket) {
  */
 function renderVerifiedLegacy(app, student) {
   app.innerHTML = `
-    <div class="bg-orbs">
-      <div class="orb orb-1"></div>
+    
       <div class="orb orb-2"></div>
     </div>
     <div class="page-center" style="position: relative; z-index: 1;">
@@ -220,8 +233,7 @@ function renderVerifiedLegacy(app, student) {
 
 function renderError(app, message) {
   app.innerHTML = `
-    <div class="bg-orbs">
-      <div class="orb orb-1"></div>
+    
       <div class="orb orb-2"></div>
     </div>
     <div class="page-center" style="position: relative; z-index: 1;">

@@ -12,7 +12,7 @@ export async function renderGenerator(container) {
   }
 
   container.innerHTML = `
-    <div class="bg-orbs"><div class="orb orb-2"></div></div>
+    </div>
     <div class="page-container">
       ${renderSteps(3)}
       <div style="max-width: 750px; margin: 0 auto;">

@@ -21,6 +21,8 @@ const MAX_PER_USER = 3;
  * @param {string} job.verifyURL
  * @param {Object} job.userProfile
  * @param {Array}  job.visibleFields
+ * @param {string} job.eventName
+ * @param {Object} [job.event] - full event object for template rendering
  */
 export function addJob(job) {
   const userId = job.userProfile.id;

@@ -14,6 +14,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
  * POST /api/upload
  * Server-side file upload for automated processing.
  * Auth: Firebase token.
+ *
+ * Requires `eventId` in the body — uses event's column mapping and custom fields.
  */
 router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async (req, res) => {
   try {
@@ -22,7 +24,39 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
     }
 
     const { userProfile, userId } = req;
-    const { institution, event, year } = req.body;
+    const { eventId } = req.body;
+
+    // Event ID is required
+    if (!eventId) {
+      return res.status(400).json({ error: 'eventId is required — tickets must belong to an event' });
+    }
+
+    // Fetch event config
+    const { data: event, error: eventErr } = await supabase
+      .from('events')
+      .select('id, name, status, column_mapping, custom_fields')
+      .eq('id', eventId)
+      .eq('user_id', userId)
+      .single();
+
+    if (eventErr || !event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    if (event.status === 'completed') {
+      return res.status(400).json({ error: `Event "${event.name}" is completed. No new tickets.` });
+    }
+
+    // Column mapping from event config
+    const mapping = event.column_mapping || {};
+    const nameField = mapping.name_field;
+    const emailField = mapping.email_field;
+
+    if (!nameField || !emailField) {
+      return res.status(400).json({
+        error: 'Column mapping not configured for this event. Go to the event page and set Name and Email columns first.',
+      });
+    }
 
     // Parse file
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
@@ -31,18 +65,6 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
 
     if (rows.length === 0) {
       return res.status(400).json({ error: 'File is empty or has no data rows' });
-    }
-
-    // Get column mapping from user profile
-    const mapping = userProfile.column_mapping || {};
-    const nameField = mapping.name_field;
-    const emailField = mapping.email_field;
-
-    if (!nameField || !emailField) {
-      return res.status(400).json({
-        error: 'Column mapping not configured. Set name and email fields in your Profile first.',
-        headers: Object.keys(rows[0]),
-      });
     }
 
     // Validate that mapped columns exist in the file
@@ -66,6 +88,7 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
         total_records: rows.length,
         status: 'processing',
         created_by: userId,
+        event_id: eventId,
       })
       .select('id')
       .single();
@@ -73,6 +96,10 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
     if (batchErr) {
       return res.status(500).json({ error: 'Failed to create batch record' });
     }
+
+    // Get field map from event config
+    const fieldMap = mapping.field_map || {};
+    const customFields = event.custom_fields || [];
 
     // Process rows asynchronously
     let processed = 0;
@@ -89,12 +116,12 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
           continue;
         }
 
-        // Build metadata from all other columns
+        // Build metadata from custom fields using field_map
         const metadata = {};
-        for (const [key, val] of Object.entries(row)) {
-          if (key !== nameField && key !== emailField) {
-            metadata[key] = val;
-          }
+        for (const field of customFields) {
+          const columnName = fieldMap[field.key] || field.key;
+          const value = row[columnName] ?? row[field.key] ?? '';
+          metadata[field.key] = String(value);
         }
 
         const result = await processEntry({
@@ -102,18 +129,16 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
           email,
           metadata,
           userId,
+          eventId,
           source: 'upload',
-          institutionName: institution || userProfile.institution_name || '',
-          eventName: event || '',
-          year: year || '',
         });
 
         if (result.success) {
           processed++;
 
-          // Queue email if SMTP is configured
-          if (userProfile.smtp_config) {
-            const visibleFields = (mapping.fields || []).filter((f) => f.visible_on_ticket);
+          // Queue email if configured
+          if (userProfile.smtp_config || userProfile.gmail_tokens) {
+            const visibleFields = customFields.filter((f) => f.in_email);
             addJob({
               ticketId: result.ticketId,
               to: email,
@@ -122,6 +147,8 @@ router.post('/upload', uploadLimiter, firebaseAuth, upload.single('file'), async
               verifyURL: result.verifyURL,
               userProfile,
               visibleFields,
+              eventName: event.name,
+              event,
             });
           }
         } else {

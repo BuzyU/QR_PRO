@@ -7,30 +7,24 @@ import { env } from '../config/env.js';
  * Unified ticket processing pipeline.
  * Both Google Forms and file upload use this same function.
  *
+ * ALL event-specific config comes from the event object — no hardcoded defaults.
+ *
  * @param {Object} params
- * @param {string} params.name - student name (mapped)
- * @param {string} params.email - student email (mapped)
- * @param {Object} params.metadata - all other fields (dynamic)
- * @param {string} params.userId - Firebase UID of the user who owns this ticket
+ * @param {string} params.name - attendee name (mapped from CSV/Form column)
+ * @param {string} params.email - attendee email (mapped from CSV/Form column)
+ * @param {Object} params.metadata - all custom field values (dynamic, from event config)
+ * @param {string} params.userId - Firebase UID of the host
+ * @param {string} params.eventId - Event ID this ticket belongs to
  * @param {string} params.source - 'form' | 'upload' | 'client'
- * @param {string} [params.institutionName]
- * @param {string} [params.eventName]
- * @param {string} [params.year]
- * @param {number} [params.batchNumber]
- * @param {string} [params.timeSlot]
- * @returns {Promise<{success: boolean, ticketId?: string, token?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, ticketId?: string, token?: string, verifyURL?: string, error?: string}>}
  */
 export async function processEntry({
   name,
   email,
   metadata = {},
   userId,
+  eventId,
   source = 'upload',
-  institutionName = '',
-  eventName = '',
-  year = '',
-  batchNumber = 1,
-  timeSlot = '',
 }) {
   // 1. Validate required fields
   if (!name || !name.trim()) {
@@ -39,53 +33,74 @@ export async function processEntry({
   if (!email || !email.trim()) {
     return { success: false, error: 'Email is required' };
   }
+  if (!eventId) {
+    return { success: false, error: 'Event ID is required — tickets must belong to an event' };
+  }
 
   const cleanName = name.trim();
   const cleanEmail = email.trim().toLowerCase();
 
-  // 2. Check for duplicates (same email + event + year for this user)
-  if (eventName) {
-    const { data: existing } = await supabase
-      .from('students')
-      .select('id')
-      .eq('email', cleanEmail)
-      .eq('event_name', eventName)
-      .eq('user_id', userId)
-      .maybeSingle();
+  // 2. Fetch event to validate it exists and belongs to the user
+  const { data: event, error: eventError } = await supabase
+    .from('events')
+    .select('id, name, status, custom_fields')
+    .eq('id', eventId)
+    .eq('user_id', userId)
+    .single();
 
-    if (existing) {
-      return { success: false, error: `Duplicate: ${cleanEmail} already has a ticket for this event` };
+  if (eventError || !event) {
+    return { success: false, error: 'Event not found or access denied' };
+  }
+
+  if (event.status === 'completed') {
+    return { success: false, error: `Event "${event.name}" is marked as completed — no new tickets can be created` };
+  }
+
+  // 3. Check for duplicates (same email + event)
+  const { data: existing } = await supabase
+    .from('students')
+    .select('id')
+    .eq('email', cleanEmail)
+    .eq('event_id', eventId)
+    .maybeSingle();
+
+  if (existing) {
+    return { success: false, error: `Duplicate: ${cleanEmail} already has a ticket for "${event.name}"` };
+  }
+
+  // 4. Validate required custom fields
+  const requiredFields = (event.custom_fields || []).filter((f) => f.required);
+  for (const field of requiredFields) {
+    const value = metadata[field.key];
+    if (value === undefined || value === null || String(value).trim() === '') {
+      return { success: false, error: `Required field "${field.label}" is missing` };
     }
   }
 
-  // 3. Generate token + signature
+  // 5. Generate token + signature
   const token = generateToken();
   const signature = generateSignature(token);
 
-  // 4. Build verify URL
+  // 6. Build verify URL
   const verifyURL = `${env.frontendUrl}/verify?token=${token}`;
 
-  // 5. Generate QR code
+  // 7. Generate QR code
   const qrDataURL = await generateQRDataURL(verifyURL);
 
-  // 6. Insert into database
+  // 8. Insert into database — no hardcoded defaults anywhere
   const { data, error } = await supabase
     .from('students')
     .insert({
       student_name: cleanName,
       email: cleanEmail,
-      urn: metadata.identifier || metadata.urn || metadata.roll_no || null,
-      institution_name: institutionName,
-      event_name: eventName || 'General Event',
-      year: year || '2024',
-      batch_number: batchNumber || 1,
-      time_slot: timeSlot || 'N/A',
+      event_id: eventId,
       token,
       signature,
       metadata,
       source,
       user_id: userId,
       email_sent: false,
+      attendance_status: 'absent',
     })
     .select('id')
     .single();

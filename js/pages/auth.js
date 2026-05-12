@@ -15,8 +15,7 @@ export function renderAuth(container) {
 
 function renderPage(container) {
   container.innerHTML = `
-    <div class="bg-orbs">
-      <div class="orb orb-1"></div>
+    
       <div class="orb orb-2"></div>
       <div class="orb orb-3"></div>
     </div>

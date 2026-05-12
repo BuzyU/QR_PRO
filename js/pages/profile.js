@@ -4,7 +4,7 @@ import { wakeServer } from '../utils/api.js';
 
 export function renderProfile(container) {
   container.innerHTML += `
-    <div class="bg-orbs"><div class="orb orb-2"></div></div>
+    </div>
     <div class="page-container">
       <div style="max-width:680px;margin:0 auto;">
         <h1 class="heading-lg text-center animate-in mb-8">

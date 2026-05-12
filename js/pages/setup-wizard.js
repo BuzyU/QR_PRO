@@ -3,66 +3,73 @@ import { state } from '../app.js';
 export function renderSetupWizard(container) {
   const user = state.currentUser;
   container.innerHTML += `
-    <div class="bg-orbs"><div class="orb orb-3"></div></div>
+    </div>
     <div class="page-container">
       <div style="max-width:720px;margin:0 auto;">
         <h1 class="heading-lg text-center animate-in mb-8"><span class="text-gradient">Setup Guide</span></h1>
         <p class="text-secondary text-center animate-in animate-in-delay-1 mb-32">
-          Follow these steps to configure email sending and Google Forms integration.
+          Follow these steps to configure your events, email delivery, and Google Forms integration.
         </p>
 
-        <!-- Step 1: Gmail SMTP -->
+        <!-- Step 1: Create an Event -->
         <div class="glass-card-static animate-in animate-in-delay-2 mb-24">
-          <div class="setup-step-header"><span class="setup-step-num">1</span><h3 class="heading-md">Gmail SMTP Setup</h3></div>
+          <div class="setup-step-header"><span class="setup-step-num">1</span><h3 class="heading-md">Create an Event</h3></div>
           <div class="setup-step-body">
-            <p>Enable your Gmail to send hall ticket emails:</p>
+            <p>Everything in QR PRO is now organized by Event. Start by creating one:</p>
             <ol class="setup-list">
-              <li>Go to <a href="https://myaccount.google.com/security" target="_blank" rel="noopener">Google Account → Security</a></li>
-              <li>Enable <strong>2-Step Verification</strong> if not already on</li>
-              <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Passwords</a></li>
-              <li>Select app: <strong>Mail</strong>, device: <strong>Other</strong> → name it "QR PRO"</li>
-              <li>Copy the 16-character password</li>
-              <li>Go to <a href="#/profile">Profile → Gmail SMTP</a> and enter your Gmail + App Password</li>
-              <li>Click <strong>Test Connection</strong> to verify</li>
+              <li>Go to your <a href="#/">Dashboard</a> and click <strong>New Event</strong>.</li>
+              <li>Give it a name and description.</li>
+              <li>Click on the event card to open the <strong>Event Details</strong> dashboard.</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Step 2: Custom Fields & Mapping -->
+        <div class="glass-card-static animate-in animate-in-delay-3 mb-24">
+          <div class="setup-step-header"><span class="setup-step-num">2</span><h3 class="heading-md">Configure Fields & Data</h3></div>
+          <div class="setup-step-body">
+            <p>Tell QR PRO what data you want to collect and display for this event:</p>
+            <ol class="setup-list">
+              <li>In your Event Dashboard, go to the <strong>Custom Fields</strong> tab.</li>
+              <li>Add fields like "Roll No" or "Department", and choose if they appear on the ticket or email.</li>
+              <li>Go to the <strong>Column Mapping</strong> tab.</li>
+              <li>Enter the EXACT column headers from your CSV or Google Form (e.g., "Email Address" or "Student Name").</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Step 3: Email Delivery -->
+        <div class="glass-card-static animate-in animate-in-delay-4 mb-24">
+          <div class="setup-step-header"><span class="setup-step-num">3</span><h3 class="heading-md">Email Delivery Setup</h3></div>
+          <div class="setup-step-body">
+            <p>Configure how tickets are sent for this event. Each event can have its own sender.</p>
+            <ol class="setup-list">
+              <li>Go to the <strong>Delivery</strong> tab in your Event Dashboard.</li>
+              <li>Choose your provider: <strong>Gmail API</strong> (Free, unlimited*) or <strong>Resend</strong>.</li>
+              <li>For Gmail: Create OAuth credentials in Google Cloud, enter your Client ID & Secret, and click <strong>Connect Gmail</strong>.</li>
+              <li>Click <strong>Send Test Email</strong> to verify your configuration.</li>
             </ol>
             <div class="setup-note">
-              <strong>Free limit:</strong> Gmail allows 500 emails/day. For higher volume, use Google Workspace (2,000/day).
+              <strong>Gmail Limits:</strong> Regular Gmail accounts can send 500 emails/day. Google Workspace accounts can send 2,000/day.
             </div>
           </div>
         </div>
 
-        <!-- Step 2: Column Mapping -->
-        <div class="glass-card-static animate-in animate-in-delay-3 mb-24">
-          <div class="setup-step-header"><span class="setup-step-num">2</span><h3 class="heading-md">Column Mapping</h3></div>
-          <div class="setup-step-body">
-            <p>Tell QR PRO which columns in your data correspond to Name, Email, etc:</p>
-            <ol class="setup-list">
-              <li>Go to <a href="#/profile">Profile → Column Mapping</a></li>
-              <li>Enter the exact column header names from your CSV/Form</li>
-              <li>Add custom fields (Roll No, Department, etc.)</li>
-              <li>Toggle <strong>"On ticket"</strong> for fields you want visible on the hall ticket</li>
-              <li>Fields NOT toggled will still be stored but won't appear on tickets</li>
-            </ol>
-          </div>
-        </div>
-
-        <!-- Step 3: Google Forms -->
-        <div class="glass-card-static animate-in animate-in-delay-4 mb-24">
-          <div class="setup-step-header"><span class="setup-step-num">3</span><h3 class="heading-md">Google Forms Integration</h3></div>
+        <!-- Step 4: Google Forms -->
+        <div class="glass-card-static animate-in animate-in-delay-5 mb-24">
+          <div class="setup-step-header"><span class="setup-step-num">4</span><h3 class="heading-md">Google Forms Integration</h3></div>
           <div class="setup-step-body">
             <p>Connect a Google Form to auto-generate tickets on submission:</p>
             <ol class="setup-list">
-              <li>Create your Google Form with fields matching your column mapping</li>
+              <li>Create a Google Form. Make sure the question titles exactly match your <strong>Column Mapping</strong>.</li>
               <li>Open the form → click <strong>⋮ → Script editor</strong></li>
               <li>Delete existing code and paste the script below</li>
-              <li>Replace <code>YOUR_API_KEY_HERE</code> with your API key from <a href="#/profile">Profile</a></li>
-              <li>Replace <code>YOUR_SERVER_URL_HERE</code> with your Render server URL</li>
-              <li>Click <strong>Run → onFormSubmit</strong> to authorize</li>
-              <li>Go to <strong>Triggers (⏰)</strong> → Add Trigger → onFormSubmit → On form submit</li>
-              <li>Submit a test form entry to verify</li>
+              <li>Replace <code>YOUR_API_KEY_HERE</code> (from <a href="#/profile">Profile</a>), <code>YOUR_SERVER_URL_HERE</code>, and <code>YOUR_EVENT_ID_HERE</code> (from the URL of your event dashboard).</li>
+              <li>Click <strong>Run → onFormSubmit</strong> to authorize Google to run the script.</li>
+              <li>Go to <strong>Triggers (⏰)</strong> → Add Trigger → <code>onFormSubmit</code> → On form submit.</li>
             </ol>
 
-            <div class="setup-code-block">
+            <div class="setup-code-block mt-16">
               <div class="setup-code-header">
                 <span>Google Apps Script</span>
                 <button class="btn btn-outline btn-sm" id="copy-script">📋 Copy</button>
@@ -70,6 +77,7 @@ export function renderSetupWizard(container) {
               <pre class="setup-code"><code>// ═══ USER CONFIGURATION ═══
 const API_KEY = 'YOUR_API_KEY_HERE';
 const SERVER_URL = 'YOUR_SERVER_URL_HERE';
+const EVENT_ID = 'YOUR_EVENT_ID_HERE';
 
 function onFormSubmit(e) {
   pingServer();
@@ -78,6 +86,7 @@ function onFormSubmit(e) {
   for (var i = 0; i &lt; responses.length; i++) {
     data[responses[i].getItem().getTitle()] = responses[i].getResponse();
   }
+  data.event_id = EVENT_ID;
   sendToServer(data);
 }
 
@@ -112,3 +121,4 @@ function sendToServer(data) {
     setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
   });
 }
+
