@@ -5,13 +5,12 @@ import { addJob, getStats } from '../services/queueService.js';
 
 const router = Router();
 
-// All admin routes require Firebase authentication
-router.use(firebaseAuth);
+// All admin routes require Firebase authentication inline
 
 /**
  * GET /api/tickets — list user's tickets with pagination
  */
-router.get('/tickets', async (req, res) => {
+router.get('/tickets', firebaseAuth, async (req, res) => {
   try {
     const page = parseInt(req.query.page || '1', 10);
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
@@ -45,7 +44,7 @@ router.get('/tickets', async (req, res) => {
 /**
  * POST /api/resend/:id — re-queue email for a specific ticket
  */
-router.post('/resend/:id', async (req, res) => {
+router.post('/resend/:id', firebaseAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -100,7 +99,7 @@ router.post('/resend/:id', async (req, res) => {
 /**
  * GET /api/batches — list user's upload batches
  */
-router.get('/batches', async (req, res) => {
+router.get('/batches', firebaseAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('upload_batches')
@@ -118,7 +117,7 @@ router.get('/batches', async (req, res) => {
 /**
  * GET /api/export — export user's tickets as JSON (frontend converts to CSV)
  */
-router.get('/export', async (req, res) => {
+router.get('/export', firebaseAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('students')
@@ -139,7 +138,7 @@ router.get('/export', async (req, res) => {
 /**
  * GET /api/queue-stats — current queue statistics (database-backed)
  */
-router.get('/queue-stats', async (req, res) => {
+router.get('/queue-stats', firebaseAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('students')

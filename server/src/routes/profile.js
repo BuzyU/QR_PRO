@@ -6,13 +6,12 @@ import { sendTestEmail } from '../services/emailService.js';
 
 const router = Router();
 
-// All profile routes require Firebase authentication
-router.use(firebaseAuth);
+// All profile routes require Firebase authentication inline
 
 /**
  * GET /api/profile — get current user's profile
  */
-router.get('/profile', (req, res) => {
+router.get('/profile', firebaseAuth, (req, res) => {
   const profile = { ...req.userProfile };
   // Never expose raw SMTP credentials — just show if configured
   if (profile.smtp_config) {
@@ -35,7 +34,7 @@ router.get('/profile', (req, res) => {
 /**
  * PUT /api/profile — update profile fields
  */
-router.put('/profile', async (req, res) => {
+router.put('/profile', firebaseAuth, async (req, res) => {
   try {
     const { display_name, institution_name } = req.body;
     const updates = {};
@@ -57,7 +56,7 @@ router.put('/profile', async (req, res) => {
 /**
  * PUT /api/profile/smtp — save SMTP credentials (encrypted)
  */
-router.put('/profile/smtp', async (req, res) => {
+router.put('/profile/smtp', firebaseAuth, async (req, res) => {
   try {
     const { from_email, resend_key } = req.body;
 
@@ -86,7 +85,7 @@ router.put('/profile/smtp', async (req, res) => {
 /**
  * POST /api/profile/smtp/test — send a test email
  */
-router.post('/profile/smtp/test', async (req, res) => {
+router.post('/profile/smtp/test', firebaseAuth, async (req, res) => {
   try {
     const { from_email, resend_key } = req.body;
 
@@ -108,7 +107,7 @@ router.post('/profile/smtp/test', async (req, res) => {
 /**
  * POST /api/profile/api-key/rotate — generate a new API key
  */
-router.post('/profile/api-key/rotate', async (req, res) => {
+router.post('/profile/api-key/rotate', firebaseAuth, async (req, res) => {
   try {
     const newKey = generateApiKey();
     const { error } = await supabase
@@ -137,7 +136,7 @@ router.post('/profile/api-key/rotate', async (req, res) => {
  *   ]
  * }
  */
-router.put('/profile/column-mapping', async (req, res) => {
+router.put('/profile/column-mapping', firebaseAuth, async (req, res) => {
   try {
     const { name_field, email_field, fields } = req.body;
 
@@ -166,7 +165,7 @@ router.put('/profile/column-mapping', async (req, res) => {
 /**
  * PUT /api/profile/ticket-template — save custom ticket HTML/CSS template
  */
-router.put('/profile/ticket-template', async (req, res) => {
+router.put('/profile/ticket-template', firebaseAuth, async (req, res) => {
   try {
     const { html, css, type } = req.body;
 
@@ -191,7 +190,7 @@ router.put('/profile/ticket-template', async (req, res) => {
 /**
  * GET /api/profile/ticket-template — get user's ticket template
  */
-router.get('/profile/ticket-template', (req, res) => {
+router.get('/profile/ticket-template', firebaseAuth, (req, res) => {
   res.json({
     template: req.userProfile.ticket_template || { type: 'default', html: '', css: '' },
   });
