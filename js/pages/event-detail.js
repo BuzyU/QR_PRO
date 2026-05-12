@@ -12,6 +12,7 @@ import {
   getGmailAuthUrl,
   testEventEmail,
   disconnectGmail,
+  getProfile,
 } from '../utils/api.js';
 import { renderEmailEditor } from '../editors/email-editor.js';
 import { renderTicketEditor } from '../editors/ticket-editor.js';
@@ -917,18 +918,18 @@ async function renderIntegrationsTab(container, eventId) {
   `;
 
   try {
-    const authHeader = await window.__qrProApp.state.currentUser?.getIdToken();
-    if (!authHeader) throw new Error('Not authenticated');
+    const res = await getProfile();
+    const apiKey = res.profile?.api_key;
 
-    const res = await fetch(`${window.API_BASE_URL || ''}/api/profile`, {
-      headers: { Authorization: `Bearer ${authHeader}` }
-    });
-    const { profile } = await res.json();
-    const apiKey = profile?.api_key;
+    if (!apiKey) throw new Error('API Key not found. Please reload the page.');
 
-    if (!apiKey) throw new Error('API Key not found');
-
-    const webhookUrl = `${window.API_BASE_URL || window.location.origin}/api/events/${eventId}/webhook?apiKey=${apiKey}`;
+    // We need the backend URL for the webhook. Since getProfile works, we know SERVER_URL exists in api.js, 
+    // but to avoid exporting it just for this, we can construct the backend URL using window.location.origin if it's identical, 
+    // but Render is on a different domain! Let's get the SERVER_URL.
+    // Wait, the easiest way to get the correct backend URL dynamically without modifying api.js is to rely on window.API_BASE_URL if it was set, 
+    // OR we can just hardcode 'https://qr-pro-server.onrender.com' here for now, just like api.js does.
+    const backendUrl = 'https://qr-pro-server.onrender.com';
+    const webhookUrl = `${backendUrl}/api/events/${eventId}/webhook?apiKey=${apiKey}`;
 
     const appsScriptCode = `/**
  * QR PRO - Google Forms Auto-Ticket Generator
