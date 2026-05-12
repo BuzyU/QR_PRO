@@ -12,7 +12,10 @@ import { google } from 'googleapis';
 import { encrypt, decrypt } from '../config/crypto.js';
 import { supabase } from '../config/supabase.js';
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/userinfo.email'
+];
 
 /**
  * Generate the Gmail OAuth2 consent URL for an event.
@@ -117,12 +120,13 @@ export async function getGmailProfile({ clientId, clientSecret, accessToken }) {
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
   oauth2Client.setCredentials({ access_token: accessToken });
 
-  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
 
   try {
-    const profile = await gmail.users.getProfile({ userId: 'me' });
-    return profile.data.emailAddress;
-  } catch {
+    const userInfo = await oauth2.userinfo.get();
+    return userInfo.data.email;
+  } catch (err) {
+    console.error('Failed to get user info:', err.message);
     return null;
   }
 }
