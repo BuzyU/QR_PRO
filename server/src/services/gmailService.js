@@ -113,16 +113,9 @@ export async function sendViaGmail({ emailConfig, to, subject, html, fromName })
 /**
  * Get the Gmail profile (email address) for the connected account.
  */
-export async function getGmailProfile({ clientId, clientSecret, refreshToken }) {
+export async function getGmailProfile({ clientId, clientSecret, accessToken }) {
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
-  oauth2Client.setCredentials({ refresh_token: refreshToken });
-
-  try {
-    const { credentials } = await oauth2Client.refreshAccessToken();
-    oauth2Client.setCredentials(credentials);
-  } catch {
-    return null;
-  }
+  oauth2Client.setCredentials({ access_token: accessToken });
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 

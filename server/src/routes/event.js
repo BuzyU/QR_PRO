@@ -57,12 +57,12 @@ router.get('/events/gmail/callback', async (req, res) => {
     const gmailEmail = await getGmailProfile({
       clientId: config.gmail_client_id,
       clientSecret: config.gmail_client_secret,
-      refreshToken: tokens.refresh_token,
+      accessToken: tokens.access_token,
     });
 
     const updatedConfig = {
       ...config,
-      gmail_refresh_token: tokens.refresh_token,
+      gmail_refresh_token: tokens.refresh_token || config.gmail_refresh_token,
       gmail_access_token: tokens.access_token,
       gmail_email: gmailEmail || '',
       gmail_connected_at: new Date().toISOString(),
