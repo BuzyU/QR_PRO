@@ -68,27 +68,29 @@ export function navigate(path) {
 }
 
 function router() {
-  const hash = window.location.hash.slice(1) || '/';
+  const rawHash = window.location.hash.slice(1) || '/';
+  const [hashPath] = rawHash.split('?');
+  
   const app = document.getElementById('app');
   if (!app) return;
 
   // --- Auth Guard ---
-  if (!state.currentUser && hash !== '/auth') {
+  if (!state.currentUser && hashPath !== '/auth') {
     window.location.hash = '/auth';
     return;
   }
-  if (state.currentUser && hash === '/auth') {
+  if (state.currentUser && hashPath === '/auth') {
     window.location.hash = '/';
     return;
   }
 
   // --- Dynamic Route Matching ---
-  let renderFn = routes[hash];
+  let renderFn = routes[hashPath];
   let routeParams = null;
 
   // Match /event/:id pattern
   if (!renderFn) {
-    const eventMatch = hash.match(/^\/event\/([a-f0-9-]+)$/i);
+    const eventMatch = hashPath.match(/^\/event\/([a-f0-9-]+)$/i);
     if (eventMatch) {
       routeParams = { eventId: eventMatch[1] };
       renderFn = (container) => renderEventDetail(container, routeParams.eventId);
@@ -105,8 +107,8 @@ function router() {
     app.innerHTML = '';
 
     // Add navbar on authenticated pages
-    if (state.currentUser && hash !== '/auth') {
-      app.appendChild(createNavbar(hash));
+    if (state.currentUser && hashPath !== '/auth') {
+      app.appendChild(createNavbar(hashPath));
     }
 
     renderFn(app);
