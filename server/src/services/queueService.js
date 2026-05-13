@@ -58,7 +58,7 @@ export async function recoverPendingEmails() {
 
   const { data: pending, error } = await supabase
     .from('students')
-    .select('id, email, student_name, metadata, token, user_id, email_retries, email_sent_at')
+    .select('id, email, student_name, metadata, token, user_id, event_id, email_retries, email_sent_at')
     .eq('email_sent', false)
     .not('email', 'is', null)
     .not('token', 'is', null)
@@ -101,8 +101,16 @@ export async function recoverPendingEmails() {
       .eq('id', ticket.user_id)
       .single();
 
-    if (!profile || !profile.smtp_config) {
-      console.warn(`[Queue] Skipping ticket ${ticket.id}: user has no Email configured`);
+    const { data: event } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', ticket.event_id)
+      .single();
+
+    if (!event?.email_config && !profile?.smtp_config) {
+      console.warn(
+        `[Queue] Skipping ticket ${ticket.id}: no email configuration found`
+      );
       continue;
     }
 
@@ -115,7 +123,7 @@ export async function recoverPendingEmails() {
       metadata: ticket.metadata || {},
       verifyURL,
       userProfile: profile,
-      visibleFields: profile.column_mapping?.fields?.filter((f) => f.visible_on_ticket) || [],
+      event,
     });
 
     recoveredCount++;
