@@ -89,7 +89,7 @@ router.post('/ticket', apiLimiter, apiKeyAuth, async (req, res) => {
     }
 
     // Queue email sending
-    if (userProfile.smtp_config || userProfile.gmail_tokens) {
+    if (event.email_config) {
       const visibleFields = (event.custom_fields || []).filter((f) => f.in_email);
       addJob({
         ticketId: result.ticketId,
