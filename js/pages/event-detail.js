@@ -924,6 +924,11 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+a// ─── Integrations Tab ────────────────────────────────────────────────
+// REPLACEMENT for renderIntegrationsTab in js/pages/event-detail.js
+// The old version generated a script hitting /api/events/:id/webhook
+// which doesn't exist. This uses the real /api/ticket endpoint.
+
 async function renderIntegrationsTab(container, eventId) {
   container.innerHTML = `
     <div class="glass-card-static">
@@ -935,161 +940,189 @@ async function renderIntegrationsTab(container, eventId) {
     const res = await getProfile();
     const apiKey = res.profile?.api_key;
 
-    if (!apiKey) throw new Error('API Key not found. Go to Profile and make sure your account is set up.');
+    if (!apiKey) throw new Error('API Key not found. Go to Profile and reload.');
 
     const backendUrl = 'https://qr-pro-server.onrender.com';
-    const webhookUrl = `${backendUrl}/api/events/${eventId}/webhook?apiKey=${apiKey}`;
 
-    // Build the Apps Script as a plain JS string.
-    // IMPORTANT: do NOT use template literals with ${} inside the script body —
-    // use string concatenation instead so the braces are literal in the output.
-    const appsScriptCode = [
-      '/**',
-      ' * QR PRO - Google Forms Auto-Ticket Generator',
-      ' * Event ID: ' + eventId,
-      ' *',
-      ' * SETUP (do this once):',
-      ' * 1. Paste this script into your Google Form -> Script editor.',
-      ' * 2. Save (Ctrl+S).',
-      ' * 3. Click Run -> onFormSubmit once to grant permissions.',
-      ' * 4. Add a Trigger: onFormSubmit / On form submit.',
-      ' * Done — every new submission will auto-generate a ticket and send the email.',
-      ' */',
-      '',
-      '// ── Configuration (pre-filled for your event) ──────────────────',
-      'var WEBHOOK_URL = "' + webhookUrl + '";',
-      '',
-      '// ── Main trigger ────────────────────────────────────────────────',
-      'function onFormSubmit(e) {',
-      '  // Wake up the Render server first (free tier cold-starts in ~30s)',
-      '  pingServer();',
-      '',
-      '  // Collect all form answers as { "Question Title": "Answer" }',
-      '  var payload = {};',
-      '  var responses = e.response.getItemResponses();',
-      '  for (var i = 0; i < responses.length; i++) {',
-      '    var title  = responses[i].getItem().getTitle();',
-      '    var answer = responses[i].getResponse();',
-      '    payload[title] = answer;',
-      '  }',
-      '',
-      '  sendWithRetry(payload);',
-      '}',
-      '',
-      '// ── Wake-up ping ─────────────────────────────────────────────────',
-      'function pingServer() {',
-      '  try {',
-      '    UrlFetchApp.fetch(WEBHOOK_URL.split("/api/")[0] + "/ping", {',
-      '      method: "get",',
-      '      muteHttpExceptions: true',
-      '    });',
-      '  } catch (e) { /* server waking up — that is fine */ }',
-      '}',
-      '',
-      '// ── Send with retry + exponential back-off ───────────────────────',
-      'function sendWithRetry(payload) {',
-      '  var delays = [0, 10000, 30000]; // 0s, 10s, 30s',
-      '  for (var attempt = 0; attempt < delays.length; attempt++) {',
-      '    if (delays[attempt] > 0) Utilities.sleep(delays[attempt]);',
-      '    try {',
-      '      var res = UrlFetchApp.fetch(WEBHOOK_URL, {',
-      '        method: "post",',
-      '        contentType: "application/json",',
-      '        payload: JSON.stringify(payload),',
-      '        muteHttpExceptions: true',
-      '      });',
-      '      var code = res.getResponseCode();',
-      '      if (code === 200) {',
-      '        Logger.log("QR PRO: ticket created OK");',
-      '        return;',
-      '      }',
-      '      // 502/503/504 = server still waking — retry',
-      '      if (code !== 502 && code !== 503 && code !== 504) {',
-      '        Logger.log("QR PRO error (" + code + "): " + res.getContentText());',
-      '        return;',
-      '      }',
-      '    } catch (err) {',
-      '      Logger.log("QR PRO network error: " + err.toString());',
-      '    }',
-      '  }',
-      '  Logger.log("QR PRO: all retries exhausted — check server logs");',
-      '}',
-    ].join('\n');
+    // ── The Apps Script uses /api/ticket (the real endpoint) ──────────
+    // It sends all form fields as-is; the server uses the event's
+    // column_mapping to find name + email, and event_id routes it
+    // to the right event.
+    const appsScriptCode = `/**
+ * QR PRO – Auto Hall Ticket Generator
+ * Event: ${currentEvent?.name || eventId}
+ *
+ * HOW TO INSTALL:
+ * 1. Open your Google Form.
+ * 2. Click ⋮ (top-right) → "Script editor".
+ * 3. Delete all existing code and paste this entire script.
+ * 4. Click 💾 Save.
+ * 5. Click the Triggers icon (🕐) on the left sidebar.
+ * 6. Click "+ Add Trigger" (bottom-right).
+ *    - Function: onFormSubmit
+ *    - Event source: From form
+ *    - Event type: On form submit
+ * 7. Click Save and grant permissions when Google asks.
+ *
+ * IMPORTANT: Make sure your Google Form question titles
+ * EXACTLY match the Column Mapping you set in QR PRO
+ * (Event → Column Mapping tab).
+ */
+
+// ── CONFIG (pre-filled for this event) ──────────────────────────
+var API_KEY    = "${apiKey}";
+var SERVER_URL = "${backendUrl}";
+var EVENT_ID   = "${eventId}";
+// ────────────────────────────────────────────────────────────────
+
+function onFormSubmit(e) {
+  // Wake the server first (free Render tier may be sleeping)
+  try {
+    UrlFetchApp.fetch(SERVER_URL + "/ping", { muteHttpExceptions: true });
+  } catch (err) { /* ignore – server may still be cold-starting */ }
+
+  // Collect every form answer into a flat key→value object.
+  // Keys are the exact question titles from your Google Form.
+  var payload = { event_id: EVENT_ID };
+  var responses = e.response.getItemResponses();
+  for (var i = 0; i < responses.length; i++) {
+    var item = responses[i];
+    payload[item.getItem().getTitle()] = item.getResponse();
+  }
+
+  // Send to QR PRO with retry + back-off
+  var delays = [0, 8000, 20000]; // immediate, 8 s, 20 s
+  for (var attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) Utilities.sleep(delays[attempt]);
+    try {
+      var response = UrlFetchApp.fetch(SERVER_URL + "/api/ticket", {
+        method          : "post",
+        contentType     : "application/json",
+        headers         : { "x-api-key": API_KEY },
+        payload         : JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+
+      var code = response.getResponseCode();
+      var body = {};
+      try { body = JSON.parse(response.getContentText()); } catch (pe) {}
+
+      if (code === 200 && body.success) {
+        logResult(payload, "SUCCESS", "Ticket ID: " + (body.ticketId || "?"));
+        return; // done
+      }
+
+      // 503 / 502 = server still waking – retry
+      if (code === 503 || code === 502) continue;
+
+      // Any other error – log and stop retrying
+      logResult(payload, "FAILED", "HTTP " + code + " – " + (body.error || "unknown"));
+      return;
+    } catch (fetchErr) {
+      if (attempt < delays.length - 1) continue;
+      logResult(payload, "ERROR", fetchErr.toString());
+    }
+  }
+}
+
+// ── Logging helper ───────────────────────────────────────────────
+function logResult(payload, status, detail) {
+  try {
+    var ss = getLinkedSheet();
+    if (!ss) return;
+    var sheet = ss.getSheetByName("QR PRO Log")
+               || ss.insertSheet("QR PRO Log");
+
+    // Add header row if sheet is empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["Timestamp", "Name", "Status", "Detail", "Raw Payload"]);
+      sheet.getRange("1:1").setFontWeight("bold");
+    }
+
+    var name = payload["Name"] || payload["Student Name"]
+             || payload["Full Name"] || Object.values(payload)[0] || "";
+    sheet.appendRow([new Date().toISOString(), name, status, detail,
+                     JSON.stringify(payload)]);
+  } catch (logErr) {
+    console.error("Logging failed: " + logErr);
+  }
+}
+
+function getLinkedSheet() {
+  try {
+    var form = FormApp.getActiveForm();
+    var destId = form.getDestinationId();
+    if (destId) return SpreadsheetApp.openById(destId);
+  } catch (e) {}
+  return null;
+}
+
+// ── Manual test (run from Script editor to verify config) ────────
+function testConfiguration() {
+  Logger.log("--- QR PRO Config Test ---");
+  Logger.log("API Key : " + API_KEY.substring(0, 8) + "...");
+  Logger.log("Server  : " + SERVER_URL);
+  Logger.log("Event ID: " + EVENT_ID);
+
+  try {
+    var ping = UrlFetchApp.fetch(SERVER_URL + "/ping", { muteHttpExceptions: true });
+    Logger.log("Ping    : HTTP " + ping.getResponseCode() + " – " + ping.getContentText());
+  } catch (e) {
+    Logger.log("Ping    : FAILED – " + e);
+  }
+  Logger.log("--- done ---");
+}`;
 
     container.innerHTML = `
       <div class="glass-card-static animate-in">
         <h3 class="heading-md mb-8">Google Forms Integration</h3>
         <p class="text-muted mb-24" style="font-size: 0.88rem; max-width: 700px;">
-          When someone submits your Google Form, QR PRO will automatically generate their hall ticket,
-          create a QR code, and send the ticket via email — no manual steps needed.<br><br>
-          Make sure <strong>Column Mapping</strong> is saved first so QR PRO knows which question is the
-          student name and which is the email address.
+          When someone submits your Google Form, QR PRO will automatically generate their
+          ticket and email it to them. Make sure the <strong>Column Mapping</strong> tab is
+          configured first so the server knows which question is the attendee's name and email.
         </p>
 
-        <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-          <h4 class="heading-sm mb-8" style="color: var(--color-primary-light);">Your Secure Webhook URL</h4>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" class="form-input" value="${webhookUrl}" readonly id="webhook-url-input"
-              style="font-family: monospace; font-size: 0.78rem;" />
-            <button class="btn btn-outline btn-sm" id="copy-webhook-btn">Copy</button>
-          </div>
-          <p class="text-muted mt-8" style="font-size: 0.75rem;">
-            ⚠️ This URL contains your API key — keep it secret.
-          </p>
+        <!-- What the script does -->
+        <div style="background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.2); border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.7;">
+          <strong style="color: var(--color-primary-light);">What this script does:</strong><br>
+          On every form submission it collects all answers and POSTs them to
+          <code style="font-size:0.78rem; color:var(--color-primary-light);">${backendUrl}/api/ticket</code>
+          with your API key and event ID. The server maps the answers using your
+          Column Mapping config, creates the ticket, generates the QR, and sends the email.
         </div>
 
         <h4 class="heading-sm mb-12">Setup Instructions</h4>
-        <ol class="text-muted mb-24" style="font-size: 0.85rem; padding-left: 20px; line-height: 2;">
-          <li>Open your Google Form → click the <strong>⋮ menu (top right)</strong> → <strong>Script editor</strong>.</li>
-          <li>Select all existing code and delete it.</li>
-          <li>Click <strong>Copy Code</strong> below and paste it into the editor.</li>
-          <li>Press <strong>Ctrl + S</strong> (or ⌘S) to save.</li>
-          <li>Click <strong>▶ Run → onFormSubmit</strong> once — Google will ask for permissions. Click <em>Advanced → Go to script → Allow</em>.</li>
-          <li>Click the <strong>Triggers (clock)</strong> icon on the left sidebar → <strong>+ Add Trigger</strong>.</li>
-          <li>Set: Function = <strong>onFormSubmit</strong> · Event source = <strong>From form</strong> · Event type = <strong>On form submit</strong>.</li>
-          <li>Click <strong>Save</strong>. Done — submit a test response to verify.</li>
+        <ol class="mb-24" style="font-size: 0.85rem; color: var(--text-secondary); padding-left: 20px; line-height: 2;">
+          <li>Open your target Google Form.</li>
+          <li>Click <strong>⋮</strong> (top-right) → <strong>"Script editor"</strong>.</li>
+          <li>Delete any existing code. Paste the script below.</li>
+          <li>Click <strong>💾 Save</strong>.</li>
+          <li>Click the <strong>Triggers (🕐)</strong> icon in the left sidebar.</li>
+          <li>Click <strong>+ Add Trigger</strong> → Function: <strong>onFormSubmit</strong> → Event type: <strong>On form submit</strong> → Save.</li>
+          <li>Grant Google the permissions it asks for.</li>
+          <li>Submit a test form response to verify everything works — check the <strong>"QR PRO Log"</strong> sheet in your linked spreadsheet.</li>
         </ol>
 
-        <div style="position: relative; margin-top: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h4 class="heading-sm" style="margin: 0;">Apps Script Code</h4>
-            <button class="btn btn-primary btn-sm" id="copy-script-btn">📋 Copy Code</button>
+        <div style="position: relative; margin-bottom: 8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <h4 class="heading-sm" style="margin:0;">Apps Script</h4>
+            <button class="btn btn-primary btn-sm" id="copy-script-btn">📋 Copy Script</button>
           </div>
-          <pre id="apps-script-pre" style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 0.78rem; border: 1px solid var(--border-color); white-space: pre; line-height: 1.6; max-height: 420px; overflow-y: auto;"></pre>
+          <pre style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.78rem; border: 1px solid var(--border-color); white-space: pre; max-height: 420px; overflow-y: auto;"><code id="apps-script-code">${escapeHtmlContent(appsScriptCode)}</code></pre>
+        </div>
+
+        <div style="background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 12px 16px; font-size: 0.8rem; color: var(--color-warning);">
+          ⚠️ Your API key is embedded in this script. Only share it with people you trust to send tickets on behalf of this event.
         </div>
       </div>
     `;
 
-    // Set code text via textContent — never innerHTML — so no entity corruption
-    document.getElementById('apps-script-pre').textContent = appsScriptCode;
-
-    document.getElementById('copy-webhook-btn')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(webhookUrl).catch(() => {
-        // fallback for older browsers
-        const input = document.getElementById('webhook-url-input');
-        input.select();
-        document.execCommand('copy');
-      });
-      const btn = document.getElementById('copy-webhook-btn');
-      btn.textContent = '✓ Copied';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-    });
-
     document.getElementById('copy-script-btn')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(appsScriptCode).catch(() => {
-        // fallback: select the pre block text
-        const pre = document.getElementById('apps-script-pre');
-        const range = document.createRange();
-        range.selectNodeContents(pre);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        document.execCommand('copy');
-        sel.removeAllRanges();
+      navigator.clipboard.writeText(appsScriptCode).then(() => {
+        const btn = document.getElementById('copy-script-btn');
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy Script'; }, 2500);
       });
-      const btn = document.getElementById('copy-script-btn');
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => { btn.textContent = '📋 Copy Code'; }, 2000);
     });
 
   } catch (err) {
@@ -1100,4 +1133,12 @@ async function renderIntegrationsTab(container, eventId) {
       </div>
     `;
   }
+}
+
+// ── helper (add alongside existing escapeAttr in the file) ──────────
+function escapeHtmlContent(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }

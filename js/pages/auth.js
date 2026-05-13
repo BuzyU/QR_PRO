@@ -248,7 +248,8 @@ function setupListeners(container) {
         await signInWithGoogle(remember);
         navigate('/');
       } catch (err) {
-        showError(getFriendlyError(err.code));
+        console.error("RAW FIREBASE ERROR:", err);
+        showError(getFriendlyError(err.code) + ' (' + err.code + ')');
       } finally {
         setLoading(false);
       }
