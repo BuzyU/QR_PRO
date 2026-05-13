@@ -94,6 +94,7 @@ export async function processEntry({
       student_name: cleanName,
       email: cleanEmail,
       event_id: eventId,
+      event_name: event.name,
       token,
       signature,
       metadata,
