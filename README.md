@@ -8,6 +8,8 @@ QR PRO is a comprehensive web-based application designed to streamline the proce
 - **Dynamic Data Mapping**: Intuitively map columns from your uploaded spreadsheet (e.g., Student Name, URN) to the required ticket fields.
 - **Batch Processing**: Automatically split large participant lists into manageable batches with assigned time slots to ensure organized entry.
 - **Automated PDF Generation**: Generate high-quality PDF hall tickets containing the institution's name, event details, participant information, and a unique QR code.
+- **Google Forms Integration**: Headless automation via webhooks. Automatically generate tickets and queue email delivery the moment a participant submits a Google Form.
+- **Automated Email Delivery**: Send beautifully designed, customizable HTML emails with embedded QR codes directly to attendees using Gmail OAuth or Resend.
 - **ZIP Export**: Bundle all generated PDF tickets into a single ZIP file for easy downloading and distribution.
 - **Real-time QR Verification**: Each generated ticket includes a unique QR code linked to a centralized database. Scanning the QR code opens a verification portal that authenticates the ticket in real-time, preventing fraud and fabricated tickets.
 
@@ -73,12 +75,23 @@ The application will typically be accessible at `http://localhost:5173`.
 
 ## Usage Guide
 
+### Manual Upload Flow
 1. **Upload Data**: Start by uploading a `.csv` or `.xlsx` file containing the list of participants.
 2. **Configure Details**: Enter the Institution Name, Event Name, and Year. Map the columns from your uploaded file to the 'Name' and 'URN' (Unique Roll Number or ID) fields.
 3. **Configure Batches**: Specify the number of batches you want to divide the participants into, and assign a time slot for each batch.
 4. **Generate**: The system will securely log the ticket records to the Supabase database and generate the PDF tickets with embedded QR codes.
 5. **Download**: Once processing is complete, download the consolidated ZIP file containing all the individual PDF tickets.
-6. **Verify**: When attendees present their tickets, scan the QR code using any standard smartphone camera. It will direct you to the `/verify.html` portal, which will query the database and display a "Verified" or "Invalid" status.
+
+### Google Forms Integration (Automated Flow)
+1. **Create Event**: Create an event in the QR PRO dashboard.
+2. **Column Mapping**: Define your custom fields (e.g., "Phone Number") and map the Google Form question titles to the required fields.
+3. **Email Configuration**: Connect your Gmail account via OAuth or use Resend to enable automated ticket delivery.
+4. **Install Apps Script**: Navigate to the Integrations tab, copy the auto-generated Google Apps Script, and paste it into your Google Form's Script Editor.
+5. **Set Trigger**: Set an "On form submit" trigger in Google Apps Script. 
+6. Whenever an attendee fills out the form, QR PRO will automatically intercept the webhook, generate the ticket, and email it to them instantly.
+
+### Verification
+- **Verify**: When attendees present their tickets, scan the QR code using any standard smartphone camera. It will direct you to the `/verify.html` portal, which will query the database and display a "Verified" or "Invalid" status.
 
 ## License
 
