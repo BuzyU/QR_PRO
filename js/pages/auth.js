@@ -4,7 +4,6 @@ import {
   signUpWithEmail,
   signInWithGoogle,
   sendPasswordReset,
-  checkRedirectResult,
 } from '../firebase.js';
 
 let mode = 'login'; // 'login' | 'signup' | 'forgot'
@@ -12,10 +11,6 @@ let mode = 'login'; // 'login' | 'signup' | 'forgot'
 export function renderAuth(container) {
   mode = 'login';
   renderPage(container);
-  
-  checkRedirectResult().catch((err) => {
-    showError(getFriendlyError(err?.code));
-  });
 }
 
 function renderPage(container) {
