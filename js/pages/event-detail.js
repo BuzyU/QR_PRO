@@ -924,7 +924,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-a// ─── Integrations Tab ────────────────────────────────────────────────
+// ─── Integrations Tab ────────────────────────────────────────────────
 // REPLACEMENT for renderIntegrationsTab in js/pages/event-detail.js
 // The old version generated a script hitting /api/events/:id/webhook
 // which doesn't exist. This uses the real /api/ticket endpoint.
