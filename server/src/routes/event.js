@@ -14,7 +14,7 @@ import { sendTestEmail as sendResendTestEmail } from '../services/emailService.j
 import { apiKeyAuth } from '../middleware/apiKeyAuth.js';
 import { processEntry } from '../services/ticketService.js';
 import { addJob } from '../services/queueService.js';
-import { uploadLimiter } from '../middleware/rateLimiter.js';
+import { apiLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -735,7 +735,7 @@ router.get('/events/gmail/callback', async (req, res) => {
  * Ingest ticket requests directly from Google Forms (or Zapier).
  * Uses API Key authentication.
  */
-router.post('/events/:id/webhook', uploadLimiter, apiKeyAuth, async (req, res) => {
+router.post('/events/:id/webhook', apiLimiter, apiKeyAuth, async (req, res) => {
   try {
     const { id: eventId } = req.params;
     const { userId, userProfile } = req;
